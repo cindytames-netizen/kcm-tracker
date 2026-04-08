@@ -564,7 +564,8 @@ body.dark .pull-btn{background:#1A7CB8;color:white;}
   <div class="controls">
     <input type="text" id="rSearch" placeholder="🔍 Search account..." oninput="renderRenewals()">
     <select id="rAdvisor" onchange="renderRenewals()"><option value="">All Advisors</option></select>
-    <select id="rMonth" onchange="renderRenewals()"><option value="">All Months</option></select>
+    <select id="rMonth" onchange="document.getElementById('rDate').value='';renderRenewals()"><option value="">All Months</option></select>
+    <input type="date" id="rDate" onchange="document.getElementById('rMonth').value='';renderRenewals()" title="Filter by specific date" style="border:1.5px solid var(--border);border-radius:10px;padding:6px 10px;font-size:12px;background:white;cursor:pointer;color:var(--text)">
     <select id="rUrgency" onchange="renderRenewals()">
       <option value="">All Urgency</option><option value="past">Overdue</option>
       <option value="red">≤ 30 Days</option><option value="days120">31–120 Days</option>
@@ -1727,6 +1728,7 @@ function clearRFilters() {
   document.getElementById('rSearch').value='';
   document.getElementById('rAdvisor').value='';
   document.getElementById('rMonth').value='';
+  document.getElementById('rDate').value='';
   document.getElementById('rUrgency').value='';
   document.getElementById('rAlerts').value='';
   document.querySelectorAll('.stat').forEach(function(s){s.classList.remove('active-filter');});
@@ -1750,6 +1752,7 @@ function renderRenewals() {
   var search=document.getElementById('rSearch').value.toLowerCase();
   var adv=document.getElementById('rAdvisor').value;
   var mf=document.getElementById('rMonth').value;
+  var df=document.getElementById('rDate').value; // specific date filter e.g. "2026-04-01"
   var urg=document.getElementById('rUrgency').value;
   var onlyA=document.getElementById('rAlerts').value==='alerts';
   var al=Object.values(accounts);
@@ -1774,6 +1777,10 @@ function renderRenewals() {
       if(mf){
         var pk=p.expDate.getFullYear()+'-'+pad(p.expDate.getMonth()+1);
         if(pk!==mf)continue;
+      }
+      // Specific date filter
+      if(df){
+        if(ek2!==df)continue;
       }
       // Apply urgency filter per date group
       if(urg){
