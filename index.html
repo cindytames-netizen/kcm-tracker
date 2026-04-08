@@ -401,7 +401,8 @@ body.dark .pull-btn{background:#1A7CB8;color:white;}
 .col-count{background:white;color:var(--muted);border-radius:20px;padding:2px 10px;font-size:11px;font-weight:700;}
 .col-body{padding:12px;display:flex;flex-direction:column;gap:12px;height:calc(100vh - 280px);overflow-y:auto;}
 .acard{background:white;border-radius:14px;box-shadow:0 2px 10px rgba(0,0,0,0.08);border-left:5px solid var(--border);overflow:visible;transition:box-shadow 0.2s,transform 0.2s;position:relative;flex-shrink:0;width:100%;}
-.acard-header,.acard-advisor,.acard-footer,.acard-alerts,.policy-lines,.policy-line{overflow:visible;}
+.acard-header,.acard-advisor,.acard-footer,.acard-alerts{overflow:hidden;}
+.policy-lines,.policy-line{overflow:visible;}
 .acard>*:first-child{border-top-left-radius:10px;border-top-right-radius:10px;}
 .acard>*:last-child{border-bottom-left-radius:10px;border-bottom-right-radius:10px;}
 .acard:hover{box-shadow:0 6px 22px rgba(0,0,0,0.13);}
@@ -428,7 +429,7 @@ body.dark .pull-btn{background:#1A7CB8;color:white;}
 .policy-line{padding:10px 18px;border-bottom:1px solid #F0F6FA;background:#FAFCFF;}
 .policy-line:last-child{border-bottom:none;}
 .pl-top{display:flex;align-items:flex-start;gap:8px;margin-bottom:6px;flex-wrap:wrap;}
-.pl-desc{font-size:13px;font-weight:600;flex:1;min-width:0;word-break:break-word;white-space:normal;}
+.pl-desc{font-size:13px;font-weight:600;flex:1;min-width:120px;overflow-wrap:break-word;word-wrap:break-word;white-space:normal;}
 .pl-carrier{font-size:11px;color:var(--muted);background:#EEF5FA;border-radius:6px;padding:2px 7px;white-space:nowrap;}
 .pl-date{font-size:11px;color:var(--muted);white-space:nowrap;}
 .pl-premium-wrap{display:flex;align-items:center;gap:4px;white-space:nowrap;}
@@ -1819,8 +1820,17 @@ function renderRenewals() {
     });
   }
 
-  // Preserve scroll position
+  // Remember which panels are open before rebuild
+  var openPanels = [];
   var kb=document.getElementById('kanban-renewals');
+  if(kb){
+    var panels = kb.querySelectorAll('.policy-lines.open, .acard-followup-panel, [id^="fl-"], [id^="nl-"]');
+    for(var pi=0;pi<panels.length;pi++){
+      if(panels[pi].classList.contains('open') || panels[pi].style.display==='block'){
+        openPanels.push(panels[pi].id);
+      }
+    }
+  }
   var scrollLeft = kb ? kb.scrollLeft : 0;
   var scrollTop = window.scrollY || document.documentElement.scrollTop;
   if(!keys.length){kb.innerHTML='<div class="empty-state"><div class="icon">🔍</div><h3>No accounts found</h3><p>Try a different month or clear filters</p></div>';return;}
@@ -1846,6 +1856,14 @@ function renderRenewals() {
     }
   }
   kb.innerHTML=html;
+  // Reopen panels that were open before
+  for(var pi=0;pi<openPanels.length;pi++){
+    var el=document.getElementById(openPanels[pi]);
+    if(el){
+      if(el.classList.contains('policy-lines')) el.classList.add('open');
+      else el.style.display='block';
+    }
+  }
   // Restore scroll position
   if(kb) kb.scrollLeft = scrollLeft;
   window.scrollTo(0, scrollTop);
