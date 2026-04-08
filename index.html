@@ -1841,7 +1841,7 @@ function renderRenewals() {
   var scrollLeft = kb ? kb.scrollLeft : 0;
   var scrollTop = window.scrollY || document.documentElement.scrollTop;
   if(!keys.length){kb.innerHTML='<div class="empty-state"><div class="icon">🔍</div><h3>No accounts found</h3><p>Try a different month or clear filters</p></div>';return;}
-  var isDaily=groupBy==='day';
+  var isDaily=groupBy==='day' || (df && df!==''); // also use daily view for specific date filter
   if(isDaily){
     kb.setAttribute('style','display:block;overflow-x:visible;padding:0 28px 30px;');
   } else {
