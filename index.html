@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -528,7 +529,6 @@ body.dark .pull-btn{background:#1A7CB8;color:white;}
     <button class="hbtn" onclick="saveAll()">💾 Save</button>
     <button class="hbtn pull-btn" onclick="syncNow()" title="Pull latest changes from Google Sheets">🔄 Pull</button>
     <button class="hbtn" onclick="exportCSV()">⬇ Export</button>
-    <button class="hbtn" onclick="openEmailModal()">🔔 Notifications</button>
     <div class="dark-toggle" onclick="toggleDark()" title="Toggle dark mode">
       <div class="dark-toggle-pill" id="darkTrack">
         <div class="dark-toggle-stars">
@@ -3104,63 +3104,6 @@ init();
 <div class="toast" id="toastMsg"></div>
 
 <!-- EMAIL NOTIFICATIONS MODAL -->
-<div class="email-modal-overlay hidden" id="emailModalOverlay" onclick="if(event.target===this)closeEmailModal()">
-<div class="email-modal">
-  <div class="email-modal-header">
-    <h2>🔔 Email Notifications</h2>
-    <p>Get alerts when renewals are approaching</p>
-  </div>
-  <div class="email-modal-body">
-    <div class="email-info-box">
-      <b>ℹ️ How this works</b>
-      Your renewal dates and email list are saved locally in your browser. Use the <strong>Export Reminder List</strong> button to download a CSV you can paste into an email scheduler (like Outlook Rules, Google Apps Script, or Zapier) to automate the actual sending. See the sharing ideas below for full automation options.
-    </div>
-
-    <div class="email-section-title">📧 Recipient Emails</div>
-    <div class="email-row">
-      <label>Add email</label>
-      <input type="email" id="emailInput" placeholder="name@company.com" onkeydown="if(event.key==='Enter')addEmailRecipient()">
-      <button class="mbtn mbtn-save" style="padding:8px 14px;font-size:12px" onclick="addEmailRecipient()">Add</button>
-    </div>
-    <div class="email-tags" id="emailTags"></div>
-
-    <div class="email-section-title">⏰ Alert Windows</div>
-    <div class="notif-row">
-      <div><div class="notif-label">🔴 Critical — 30 days out</div><div class="notif-sub">Urgent renewal alert</div></div>
-      <input type="checkbox" id="notif30" checked style="width:18px;height:18px;cursor:pointer">
-    </div>
-    <div class="notif-row">
-      <div><div class="notif-label">🟡 Warning — 60 days out</div><div class="notif-sub">Start quoting reminder</div></div>
-      <input type="checkbox" id="notif60" checked style="width:18px;height:18px;cursor:pointer">
-    </div>
-    <div class="notif-row">
-      <div><div class="notif-label">🔵 Heads up — 90 days out</div><div class="notif-sub">Early planning notice</div></div>
-      <input type="checkbox" id="notif90" style="width:18px;height:18px;cursor:pointer">
-    </div>
-    <div class="notif-row">
-      <div><div class="notif-label">🚨 Overdue — past expiration</div><div class="notif-sub">Missed renewal alert</div></div>
-      <input type="checkbox" id="notifOverdue" checked style="width:18px;height:18px;cursor:pointer">
-    </div>
-
-    <div class="email-section-title">📋 Advisor Filter</div>
-    <div class="email-row">
-      <label>Send alerts for</label>
-      <select id="notifAdvisor" style="border:1.5px solid var(--border);border-radius:10px;padding:8px 12px;font-size:12px;background:var(--input-bg,white);color:var(--text);outline:none;flex:1">
-        <option value="">All Advisors</option>
-      </select>
-    </div>
-
-    <div class="email-section-title">📤 Export &amp; Automate</div>
-    <div class="email-info-box" style="background:var(--green-light);color:var(--green-dark)">
-      <b>📥 Export Reminder List</b>
-      Downloads a CSV of all upcoming renewals matching your alert windows and advisor filter — ready to paste into any email automation tool.
-    </div>
-    <button class="mbtn mbtn-save" style="width:100%;padding:10px;font-size:13px;margin-top:4px" onclick="exportReminderCSV()">⬇ Export Reminder List (CSV)</button>
-  </div>
-  <div class="email-modal-footer">
-    <button class="mbtn mbtn-cancel" onclick="closeEmailModal()">Close</button>
-    <button class="mbtn mbtn-save" onclick="saveEmailSettings()">💾 Save Settings</button>
-  </div>
 </div>
 </div>
 
