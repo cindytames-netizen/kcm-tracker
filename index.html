@@ -1579,10 +1579,11 @@ function openTimeOffModal(id) {
   if(id) for(var i=0;i<timeOff.length;i++) if(timeOff[i].id===id){entry=timeOff[i];break;}
   // Populate name dropdown from advisors
   var sel = document.getElementById('toName');
-  sel.innerHTML = '';
-  for(var i=0;i<ADVISORS.length;i++){
+  sel.innerHTML = '<option value="">— Select —</option>';
+  var toNames = ['Kali Martinez', 'Cindy Tames'];
+  for(var i=0;i<toNames.length;i++){
     var o=document.createElement('option');
-    o.value=ADVISORS[i];o.textContent=ADVISORS[i];
+    o.value=toNames[i];o.textContent=toNames[i];
     sel.appendChild(o);
   }
   document.getElementById('toStart').value = entry?entry.start:'';
