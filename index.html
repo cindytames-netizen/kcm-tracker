@@ -1398,8 +1398,9 @@ function gsBuildPayload() {
   };
 }
 
-function gsPushData() {
+function gsPushData(retryCount) {
   if (!gsEnabled()) return;
+  retryCount = retryCount || 0;
   clearTimeout(_gsTimer);
   _gsTimer = setTimeout(function() {
     setSyncStatus('saving...', 'orange');
@@ -1412,26 +1413,28 @@ function gsPushData() {
         policies: payload.policies,
         accounts: payload.accounts,
         newBiz: payload.newBiz,
-        rules: payload.rules
+        rules: payload.rules,
+        timeOff: payload.timeOff
       })
     })
     .then(function(r){ return r.text(); })
     .then(function(t){
-      console.log('GS response:', t);
       try {
         var d = JSON.parse(t);
         if(d.ok) setSyncStatus('synced ✓ ' + new Date().toLocaleTimeString(), 'green');
+        else if(d.error && d.error.indexOf('Lock') >= 0 && retryCount < 3) {
+          // Lock timeout — retry after 3 seconds
+          setSyncStatus('retrying...', 'orange');
+          setTimeout(function(){ gsPushData(retryCount + 1); }, 3000);
+        }
         else { setSyncStatus('save error: ' + (d.error||''), 'red'); console.error('Save error:', d); }
       } catch(e) {
-        console.log('Response was not JSON:', t.substring(0,200));
-        // GAS redirects return HTML — if we got a response it likely worked
         if(t && t.length > 0) setSyncStatus('synced ✓ ' + new Date().toLocaleTimeString(), 'green');
         else setSyncStatus('save error', 'red');
       }
     })
     .catch(function(e){
       setSyncStatus('save error', 'red');
-      alert('Push failed: ' + e.message);
       console.error('Push failed:', e);
     });
   }, 800);
