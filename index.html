@@ -570,7 +570,6 @@ body.dark .pull-btn{background:#1A7CB8;color:white;}
       <option value="red">≤ 30 Days</option><option value="days120">31–120 Days</option>
     </select>
     <div class="seg">
-      <button class="seg-btn active" id="grp-biweekly" onclick="setGroup('biweekly')">Biweekly</button>
       <button class="seg-btn" id="grp-day" onclick="setGroup('day')">Daily</button>
     </div>
     <button class="cbtn cbtn-sky" onclick="setCurrentMonth()">📅 This Month</button>
@@ -760,7 +759,7 @@ var DEFAULT_RULES=[
   {id:'r4',name:'Loss Runs Not Received (30 days)',desc:'Loss runs not received and renewal ≤ 30 days',field:'lossRuns',op:'notChecked',val:'',daysCond:'lte',daysVal:30,msg:'Request loss runs — renewal approaching',severity:'warn',on:true,builtIn:true}
 ];
 var today=new Date(); today.setHours(0,0,0,0);
-var policies=[], accounts={}, newBiz=[], rules=[], groupBy='biweekly';
+var policies=[], accounts={}, newBiz=[], rules=[], groupBy='weekly';
 var editingId=null, rewriteAcct=null, rewriteSel=null;
 
 var ADVISORS=['Guy Billups','Todd Range','Ray Deaton','DJ Drysdale Jr','Riley Wilhoit','Todd Sherrer'];
@@ -1794,7 +1793,7 @@ function switchTab(t) {
 
 function setGroup(g) {
   groupBy=g;
-  var gs=['biweekly','day'];
+  var gs=['weekly','day'];
   for(var i=0;i<gs.length;i++){var _el=document.getElementById('grp-'+gs[i]);if(_el)_el.classList.toggle('active',gs[i]===g);}
   renderRenewals();
 }
