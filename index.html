@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -551,7 +550,7 @@ body.dark .pull-btn{background:#1A7CB8;color:white;}
   <div class="tab" id="tab-newbiz" onclick="switchTab('newbiz')">✨ New Business <span class="tab-badge" id="tb-newbiz">0</span></div>
   <div class="tab" id="tab-completed" onclick="switchTab('completed')">✅ Completed <span class="tab-badge" id="tb-completed">0</span></div>
   <div class="tab" id="tab-cancelled" onclick="switchTab('cancelled')">🚫 Cancelled <span class="tab-badge" id="tb-cancelled">0</span></div>
-  <div class="tab" id="tab-rules" onclick="switchTab('rules')">⚙️ Rules <span class="tab-badge" id="tb-rules">0</span></div>
+  <div class="tab" id="tab-timeoff" onclick="switchTab('timeoff')">🏖️ Time Off</div>
 </div>
 
 <div id="section-renewals">
@@ -570,11 +569,8 @@ body.dark .pull-btn{background:#1A7CB8;color:white;}
       <option value="">All Urgency</option><option value="past">Overdue</option>
       <option value="red">≤ 30 Days</option><option value="days120">31–120 Days</option>
     </select>
-    <select id="rAlerts" onchange="renderRenewals()"><option value="">All</option><option value="alerts">🚨 Alerts Only</option></select>
     <div class="seg">
-      <button class="seg-btn active" id="grp-date" onclick="setGroup('date')">Month</button>
-      <button class="seg-btn" id="grp-biweekly" onclick="setGroup('biweekly')">Biweekly</button>
-      <button class="seg-btn" id="grp-weekly" onclick="setGroup('weekly')">Weekly</button>
+      <button class="seg-btn active" id="grp-biweekly" onclick="setGroup('biweekly')">Biweekly</button>
       <button class="seg-btn" id="grp-day" onclick="setGroup('day')">Daily</button>
     </div>
     <button class="cbtn cbtn-sky" onclick="setCurrentMonth()">📅 This Month</button>
@@ -640,7 +636,7 @@ body.dark .pull-btn{background:#1A7CB8;color:white;}
   <div class="kanban" id="kanban-cancelled"></div>
 </div>
 
-<div id="section-rules" class="hidden">
+<div id="section-rules" class="hidden" style="display:none!important">
   <div class="rules-section">
     <div class="rules-header">
       <div><h2 style="font-size:16px;font-weight:700;">⚙️ Rules</h2><p style="font-size:12px;color:var(--muted);margin-top:4px;">Automated alerts on cards and Action Items tab</p></div>
@@ -671,7 +667,34 @@ body.dark .pull-btn{background:#1A7CB8;color:white;}
   </div>
 </div>
 
-<!-- REWRITE MODAL -->
+<div id="section-timeoff" class="hidden">
+  <div class="rules-section">
+    <div class="rules-header">
+      <div><h2 style="font-size:16px;font-weight:700;">🏖️ Team Time Off</h2><p style="font-size:12px;color:var(--muted);margin-top:4px;">Track upcoming time off for your team</p></div>
+      <button class="add-btn" onclick="openTimeOffModal()">＋ Add Time Off</button>
+    </div>
+    <div id="timeoff-list"></div>
+  </div>
+</div>
+<!-- TIME OFF MODAL -->
+<div class="modal-overlay hidden" id="timeOffOverlay" onclick="if(event.target===this)closeTimeOffModal()">
+<div class="modal">
+  <div class="modal-header"><h2>🏖️ Add Time Off</h2></div>
+  <div class="modal-body">
+    <div class="field-group"><label>Name</label>
+      <select id="toName"></select>
+    </div>
+    <div class="field-group"><label>Start Date</label><input type="date" id="toStart"></div>
+    <div class="field-group"><label>End Date</label><input type="date" id="toEnd"></div>
+  </div>
+  <div class="modal-footer">
+    <button class="mbtn mbtn-delete hidden" id="toDelete" onclick="deleteTimeOff()">🗑 Delete</button>
+    <button class="mbtn mbtn-cancel" onclick="closeTimeOffModal()">Cancel</button>
+    <button class="mbtn mbtn-save" onclick="saveTimeOff()">Save</button>
+  </div>
+</div>
+</div>
+
 <div class="modal-overlay hidden" id="rewriteOverlay" onclick="if(event.target===this)closeRewrite()">
 <div class="modal">
   <div class="modal-header"><h2>🔁 Rewrite — Update Policy Dates</h2><p id="rewriteAcctName"></p></div>
@@ -729,7 +752,7 @@ body.dark .pull-btn{background:#1A7CB8;color:white;}
 </div>
 
 <script>
-var SK='kcm_v5', SK_NB='kcm_nb_v3', SK_RULES='kcm_rules_v3';
+var SK='kcm_v5', SK_NB='kcm_nb_v3', SK_RULES='kcm_rules_v3', SK_TO='kcm_to_v1';
 
 var DEFAULT_RULES=[
   {id:'r2',name:'Not Submitted (120 days)',desc:'No submission and renewal ≤ 120 days',field:'submitted',op:'notChecked',val:'',daysCond:'lte',daysVal:120,msg:'Escalate — not yet submitted',severity:'crit',on:true,builtIn:true},
@@ -737,7 +760,7 @@ var DEFAULT_RULES=[
   {id:'r4',name:'Loss Runs Not Received (30 days)',desc:'Loss runs not received and renewal ≤ 30 days',field:'lossRuns',op:'notChecked',val:'',daysCond:'lte',daysVal:30,msg:'Request loss runs — renewal approaching',severity:'warn',on:true,builtIn:true}
 ];
 var today=new Date(); today.setHours(0,0,0,0);
-var policies=[], accounts={}, newBiz=[], rules=[], groupBy='date';
+var policies=[], accounts={}, newBiz=[], rules=[], groupBy='biweekly';
 var editingId=null, rewriteAcct=null, rewriteSel=null;
 
 var ADVISORS=['Guy Billups','Todd Range','Ray Deaton','DJ Drysdale Jr','Riley Wilhoit','Todd Sherrer'];
@@ -1307,6 +1330,7 @@ function loadSaved() {
     }
     var nb=localStorage.getItem(SK_NB); if(nb)newBiz=JSON.parse(nb);
     var rl=localStorage.getItem(SK_RULES);
+    var to=localStorage.getItem(SK_TO); if(to)timeOff=JSON.parse(to);
     if(rl) {
       var sv=JSON.parse(rl); rules=[];
       for(var i=0;i<DEFAULT_RULES.length;i++){var found=null;for(var j=0;j<sv.length;j++){if(sv[j].id===DEFAULT_RULES[i].id){found=sv[j];break;}}var rc={};for(var k in DEFAULT_RULES[i])rc[k]=DEFAULT_RULES[i][k];if(found)rc.on=found.on;rules.push(rc);}
@@ -1368,7 +1392,8 @@ function gsBuildPayload() {
     policies: JSON.stringify(pd),
     accounts: JSON.stringify(ad),
     newBiz: JSON.stringify(newBiz),
-    rules: JSON.stringify(rules)
+    rules: JSON.stringify(rules),
+    timeOff: JSON.stringify(timeOff)
   };
 }
 
@@ -1492,6 +1517,7 @@ function applyGSData(data) {
     } catch(e) { console.warn('accounts error',e); }
   }
   if (data.newBiz) { try { var nb=JSON.parse(data.newBiz); if(Array.isArray(nb)) newBiz=nb; } catch(e){} }
+  if (data.timeOff) { try { var to=JSON.parse(data.timeOff); if(Array.isArray(to)) timeOff=to; } catch(e){} }
 
   // Background auto-sync: NEVER re-render, just update data silently
   // Only re-render on manual Pull click
@@ -1541,6 +1567,104 @@ function initGoogleSync() {
   }, 60000);
 }
 
+// ─────────────────────────────────────────────
+// TIME OFF
+// ─────────────────────────────────────────────
+var timeOff = [];
+var _editingToId = null;
+
+function openTimeOffModal(id) {
+  _editingToId = id || null;
+  var entry = null;
+  if(id) for(var i=0;i<timeOff.length;i++) if(timeOff[i].id===id){entry=timeOff[i];break;}
+  // Populate name dropdown from advisors
+  var sel = document.getElementById('toName');
+  sel.innerHTML = '';
+  for(var i=0;i<ADVISORS.length;i++){
+    var o=document.createElement('option');
+    o.value=ADVISORS[i];o.textContent=ADVISORS[i];
+    sel.appendChild(o);
+  }
+  document.getElementById('toStart').value = entry?entry.start:'';
+  document.getElementById('toEnd').value = entry?entry.end:'';
+  if(entry) sel.value = entry.name;
+  document.getElementById('toDelete').classList.toggle('hidden', !id);
+  document.getElementById('timeOffOverlay').classList.remove('hidden');
+}
+
+function closeTimeOffModal() {
+  document.getElementById('timeOffOverlay').classList.add('hidden');
+  _editingToId = null;
+}
+
+function saveTimeOff() {
+  var name = document.getElementById('toName').value;
+  var start = document.getElementById('toStart').value;
+  var end = document.getElementById('toEnd').value;
+  if(!name||!start||!end){alert('Please fill in all fields.');return;}
+  if(start>end){alert('End date must be after start date.');return;}
+  if(_editingToId){
+    for(var i=0;i<timeOff.length;i++){
+      if(timeOff[i].id===_editingToId){timeOff[i]={id:_editingToId,name:name,start:start,end:end};break;}
+    }
+  } else {
+    timeOff.push({id:'to_'+Date.now(),name:name,start:start,end:end});
+  }
+  closeTimeOffModal();
+  saveAll();
+  renderTimeOff();
+}
+
+function deleteTimeOff() {
+  if(!_editingToId)return;
+  timeOff=timeOff.filter(function(t){return t.id!==_editingToId;});
+  closeTimeOffModal();
+  saveAll();
+  renderTimeOff();
+}
+
+function renderTimeOff() {
+  var el=document.getElementById('timeoff-list');
+  if(!el)return;
+  if(!timeOff.length){
+    el.innerHTML='<div class="empty-state"><div class="icon">🏖️</div><h3>No time off scheduled</h3><p>Click ＋ Add Time Off to add an entry</p></div>';
+    return;
+  }
+  // Sort by start date
+  var sorted=timeOff.slice().sort(function(a,b){return a.start<b.start?-1:1;});
+  var todayStr=today.toISOString().split('T')[0];
+  var upcoming=sorted.filter(function(t){return t.end>=todayStr;});
+  var past=sorted.filter(function(t){return t.end<todayStr;});
+  var html='';
+  if(upcoming.length){
+    html+='<div style="margin-bottom:8px;font-size:12px;font-weight:700;color:var(--muted);padding:0 4px">UPCOMING</div>';
+    for(var i=0;i<upcoming.length;i++) html+=toCard(upcoming[i],false);
+  }
+  if(past.length){
+    html+='<div style="margin:16px 0 8px;font-size:12px;font-weight:700;color:var(--muted);padding:0 4px">PAST</div>';
+    for(var i=0;i<past.length;i++) html+=toCard(past[i],true);
+  }
+  el.innerHTML=html;
+}
+
+function toCard(t, isPast) {
+  var s=new Date(t.start+'T00:00:00');
+  var e=new Date(t.end+'T00:00:00');
+  var ds=s.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
+  var de=e.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
+  var days=Math.round((e-s)/86400000)+1;
+  var isSame=t.start===t.end;
+  var dateStr=isSame?ds:ds+' — '+de+' ('+days+' day'+(days===1?'':'s')+')';
+  var isOn=!isPast&&t.start<=new Date().toISOString().split('T')[0]&&t.end>=new Date().toISOString().split('T')[0];
+  return '<div style="display:flex;align-items:center;justify-content:space-between;padding:14px 18px;background:'+(isPast?'#f9f9f9':'white')+';border-radius:12px;margin-bottom:10px;box-shadow:0 1px 4px rgba(0,0,0,0.06);opacity:'+(isPast?'0.6':'1')+';border-left:4px solid '+(isOn?'var(--green)':isPast?'#ccc':'var(--sky)+')+'">'
+    +'<div>'
+      +'<div style="font-size:14px;font-weight:700;color:var(--text)">👤 '+t.name+(isOn?' <span style="background:#e8f5e9;color:#3A7D5C;border-radius:10px;padding:2px 8px;font-size:11px">Out today</span>':'')+'</div>'
+      +'<div style="font-size:12px;color:var(--muted);margin-top:3px">📅 '+dateStr+'</div>'
+    +'</div>'
+    +'<button onclick="openTimeOffModal(\''+t.id+'\')" style="background:#f0f4f8;border:none;border-radius:8px;padding:6px 12px;font-size:12px;cursor:pointer;color:var(--text)">✏️ Edit</button>'
+    +'</div>';
+}
+
 function saveAll() {
   try {
     var pd={};
@@ -1549,6 +1673,7 @@ function saveAll() {
     localStorage.setItem(SK,JSON.stringify({policies:pd,accounts:ad}));
     localStorage.setItem(SK_NB,JSON.stringify(newBiz));
     localStorage.setItem(SK_RULES,JSON.stringify(rules));
+    localStorage.setItem(SK_TO,JSON.stringify(timeOff));
     gsPushData();
     var t=document.getElementById('savedTag');t.style.display='inline-block';setTimeout(function(){t.style.display='none';},2500);
   } catch(e){alert('Save failed: '+e.message);}
@@ -1646,7 +1771,7 @@ function updateStats() {
   document.getElementById('tb-completed').textContent=compGroups;
   document.getElementById('tb-cancelled').textContent=canc.length;
   document.getElementById('tb-newbiz').textContent=newBiz.length;
-  document.getElementById('tb-rules').textContent=ron;
+  var _tbRules=document.getElementById('tb-rules');if(_tbRules)_tbRules.textContent=ron;
   document.getElementById('compTotal').textContent=compGroups;
   document.getElementById('cancTotal').textContent=canc.length;
   document.getElementById('compMonth').textContent=compGroupsThisMonth;
@@ -1658,17 +1783,18 @@ function updateStats() {
 }
 
 function switchTab(t) {
-  var tabs=['renewals','actions','newbiz','completed','cancelled','rules'];
+  var tabs=['renewals','actions','newbiz','completed','cancelled','timeoff'];
   for(var i=0;i<tabs.length;i++){document.getElementById('section-'+tabs[i]).classList.toggle('hidden',tabs[i]!==t);document.getElementById('tab-'+tabs[i]).classList.toggle('active',tabs[i]===t);}
   if(t==='actions')renderActions();
   if(t==='completed')renderCompleted();
   if(t==='cancelled')renderCancelled();
+  if(t==='timeoff')renderTimeOff();
 }
 
 function setGroup(g) {
   groupBy=g;
-  var gs=['date','biweekly','weekly','day'];
-  for(var i=0;i<gs.length;i++)document.getElementById('grp-'+gs[i]).classList.toggle('active',gs[i]===g);
+  var gs=['biweekly','day'];
+  for(var i=0;i<gs.length;i++){var _el=document.getElementById('grp-'+gs[i]);if(_el)_el.classList.toggle('active',gs[i]===g);}
   renderRenewals();
 }
 
@@ -1730,7 +1856,6 @@ function clearRFilters() {
   document.getElementById('rMonth').value='';
   document.getElementById('rDate').value='';
   document.getElementById('rUrgency').value='';
-  document.getElementById('rAlerts').value='';
   document.querySelectorAll('.stat').forEach(function(s){s.classList.remove('active-filter');});
   renderRenewals();
 }
@@ -1754,7 +1879,7 @@ function renderRenewals() {
   var mf=document.getElementById('rMonth').value;
   var df=document.getElementById('rDate').value; // specific date filter e.g. "2026-04-01"
   var urg=document.getElementById('rUrgency').value;
-  var onlyA=document.getElementById('rAlerts').value==='alerts';
+  var onlyA=false;
   var al=Object.values(accounts);
 
   // groups[groupKey] = array of {acct, pols, exactDateKey}
