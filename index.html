@@ -1859,6 +1859,7 @@ function clearRFilters() {
   document.getElementById('rDate').value='';
   document.getElementById('rUrgency').value='';
   document.querySelectorAll('.stat').forEach(function(s){s.classList.remove('active-filter');});
+  window._openPanelsOverride = []; // clear any remembered open panels
   setGroup('weekly');
 }
 
@@ -1954,14 +1955,19 @@ function renderRenewals() {
     });
   }
 
-  // Remember which panels are open before rebuild
+  // Remember which panels are open before rebuild (skip if override says clear all)
   var openPanels = [];
-  var kb=document.getElementById('kanban-renewals');
-  if(kb){
-    var panels = kb.querySelectorAll('.policy-lines.open, .acard-followup-panel, [id^="fl-"], [id^="nl-"]');
-    for(var pi=0;pi<panels.length;pi++){
-      if(panels[pi].classList.contains('open') || panels[pi].style.display==='block'){
-        openPanels.push(panels[pi].id);
+  if(window._openPanelsOverride !== null && window._openPanelsOverride !== undefined) {
+    openPanels = window._openPanelsOverride;
+    window._openPanelsOverride = null;
+  } else {
+    var kb=document.getElementById('kanban-renewals');
+    if(kb){
+      var panels = kb.querySelectorAll('.policy-lines.open, [id^="fl-"], [id^="nl-"]');
+      for(var pi=0;pi<panels.length;pi++){
+        if(panels[pi].classList.contains('open') || panels[pi].style.display==='block'){
+          openPanels.push(panels[pi].id);
+        }
       }
     }
   }
@@ -2100,7 +2106,7 @@ function makeCard(a,visiblePols,groupKey) {
   var flPanel='<div class="acard-followup-panel" id="fl-'+sk+'">'
     +flItems
     +'<div class="add-fl-row">'
-    +'<input id="finp'+nid+'" placeholder="Log follow-up..." style="color:#1C2B36;background:#fff;-webkit-text-fill-color:#1C2B36">'
+    +'<input id="finp'+nid+'" placeholder="Log follow-up..." style="color:#1C2B36;background:#fff;-webkit-text-fill-color:#1C2B36" onkeydown="if(event.key===\'Enter\'){event.preventDefault();window._addEntry('+nid+',\'fl\');}">'
     +'<button class="add-fl-btn" onclick="window._addEntry('+nid+',\'fl\')">Log</button>'
     +'</div></div>';
   var nlItems='';
@@ -2111,7 +2117,7 @@ function makeCard(a,visiblePols,groupKey) {
   var nlPanel='<div class="acard-followup-panel" id="nl-'+sk+'">'
     +nlItems
     +'<div class="add-fl-row">'
-    +'<input id="ninp'+nid+'" placeholder="Add a note..." style="color:#1C2B36;background:#fff;-webkit-text-fill-color:#1C2B36">'
+    +'<input id="ninp'+nid+'" placeholder="Add a note..." style="color:#1C2B36;background:#fff;-webkit-text-fill-color:#1C2B36" onkeydown="if(event.key===\'Enter\'){event.preventDefault();window._addEntry('+nid+',\'nl\');}">'
     +'<button class="add-fl-btn" style="background:var(--sky)" onclick="window._addEntry('+nid+',\'nl\')">Add</button>'
     +'</div></div>';
   var dailyStyle=groupBy==='day'?' style="width:100%;max-width:100%;min-width:0;box-sizing:border-box;"':'';
@@ -2129,9 +2135,9 @@ function makeCard(a,visiblePols,groupKey) {
       return '<div style="padding:0 18px 12px"><select class="status-select" data-cid="'+cid+'">'+shtml+'</select></div>';
     })()    +'</div>'
     +alertBanner
-    +'<div class="policy-lines'+(groupBy==='day'?' open':'')+'" id="pl-'+sk+'">'+polLines+'</div>'
+    +'<div class="policy-lines" id="pl-'+sk+'">'+polLines+'</div>'
     +'<div class="acard-footer">'
-      +'<button class="expand-policies-btn" onclick="togglePolicies(\''+sk+'\',this,event)">'+(groupBy==='day'?'📋 Hide Policies':'📋 View Policies')+'</button>'
+      +'<button class="expand-policies-btn" onclick="togglePolicies(\''+sk+'\',this,event)">'+'📋 View Policies'+'</button>'
       +'<button class="followup-btn" onclick="togglePanel(\'fl-'+sk+'\',event)">📞 Follow-up'+(fl.length?' ('+fl.length+')':'')+'</button>'
       +'<button class="followup-btn" style="background:var(--sky-light);color:var(--sky-dark)" onclick="togglePanel(\'nl-'+sk+'\',event)">📝 Notes'+(nl.length?' ('+nl.length+')':'')+'</button>'
     +'</div>'
