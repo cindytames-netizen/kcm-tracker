@@ -279,10 +279,10 @@ body.dark .empty-state h3{color:var(--text);}
 body.dark .empty-state p{color:var(--muted);}
 
 /* ── Scrollbars — thin & glowy ── */
-body.dark ::-webkit-scrollbar{width:4px;height:4px;}
-body.dark ::-webkit-scrollbar-track{background:transparent;}
-body.dark ::-webkit-scrollbar-thumb{background:linear-gradient(180deg,rgba(103,215,255,0.3),rgba(200,170,255,0.3));border-radius:4px;}
-body.dark ::-webkit-scrollbar-thumb:hover{background:linear-gradient(180deg,rgba(103,215,255,0.5),rgba(200,170,255,0.5));}
+body.dark ::-webkit-scrollbar{width:8px;height:12px;}
+body.dark ::-webkit-scrollbar-track{background:rgba(255,255,255,0.05);border-radius:8px;}
+body.dark ::-webkit-scrollbar-thumb{background:linear-gradient(180deg,rgba(103,215,255,0.4),rgba(200,170,255,0.4));border-radius:8px;}
+body.dark ::-webkit-scrollbar-thumb:hover{background:linear-gradient(180deg,rgba(103,215,255,0.6),rgba(200,170,255,0.6));}
 
 /* ── Email modal in dark ── */
 body.dark .email-modal{
@@ -383,8 +383,10 @@ body.dark .pull-btn{background:#1A7CB8;color:white;}
 .cbtn-red{background:#fdeaea;color:var(--red);}
 .cbtn-sky{background:var(--sky-light);color:var(--sky-dark);}
 .kanban{padding:0 28px 30px;display:flex;gap:18px;overflow-x:auto;align-items:flex-start;}
-.kanban::-webkit-scrollbar{height:6px;}
-.kanban::-webkit-scrollbar-thumb{background:var(--sky);border-radius:3px;}
+.kanban::-webkit-scrollbar{height:12px;}
+.kanban::-webkit-scrollbar-track{background:#f0f4f8;border-radius:8px;margin:0 8px;}
+.kanban::-webkit-scrollbar-thumb{background:var(--sky);border-radius:8px;border:2px solid #f0f4f8;}
+.kanban::-webkit-scrollbar-thumb:hover{background:var(--sky-dark);}
 .col{background:#E8EFF5;border-radius:var(--radius);min-width:480px;max-width:520px;flex-shrink:0;}
 .col-daily{background:#E8EFF5;border-radius:var(--radius);width:100%;box-sizing:border-box;margin-bottom:24px;}
 .view-daily{display:block !important;overflow-x:visible !important;}
