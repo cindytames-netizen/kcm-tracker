@@ -1857,7 +1857,7 @@ function clearRFilters() {
   document.getElementById('rDate').value='';
   document.getElementById('rUrgency').value='';
   document.querySelectorAll('.stat').forEach(function(s){s.classList.remove('active-filter');});
-  renderRenewals();
+  setGroup('weekly');
 }
 
 function getGroupKey(expDate) {
