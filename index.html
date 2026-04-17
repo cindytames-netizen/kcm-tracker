@@ -2656,6 +2656,26 @@ function renderCompleted() {
     html+='<div class="col"><div class="col-header"><h3>'+k+'</h3><span class="col-count">'+items.length+'</span></div><div class="col-body">'+cards+'</div></div>';
   }
   kb.innerHTML=html;
+
+  // Also show completed New Business entries
+  var completedNB = newBiz.filter(function(d){ return d.status==='Completed'; });
+  if(completedNB.length){
+    var nbHtml='<div style="margin-top:24px"><div class="col-header" style="margin-bottom:12px"><h3>Completed New Business</h3><span class="col-count">'+completedNB.length+'</span></div><div style="display:flex;flex-wrap:wrap;gap:16px">';
+    for(var i=0;i<completedNB.length;i++){
+      var d=completedNB[i];
+      var ds=d.effectiveDate?new Date(d.effectiveDate).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}):'—';
+      var es=d.expirationDate?new Date(d.expirationDate).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}):'—';
+      nbHtml+='<div class="acard urg-green" style="border-left-color:var(--green);min-width:260px;max-width:340px">'
+        +'<div class="comp-banner"><span style="font-size:12px;font-weight:700;color:var(--green-dark)">New Biz Complete</span></div>'
+        +'<div class="acard-header"><div class="acard-name">'+(d.accountName||'Unnamed')+'</div>'
+        +'<div style="font-size:11px;color:var(--muted);margin-top:4px">🚀 Eff. '+ds+' · 📅 Exp. '+es+'</div></div>'
+        +'<div class="acard-advisor"><div class="advisor-tag" style="padding:0 18px 12px">👤 <span>'+(d.advisor||'—')+'</span></div>'
+        +'<div style="padding:0 18px 12px"><button class="followup-btn" style="background:#fdeaea;color:var(--red)" onclick="undoNBComplete(\''+d.id+'\')">↩ Move Back</button></div></div>'
+        +'</div>';
+    }
+    nbHtml+='</div></div>';
+    kb.innerHTML+=nbHtml;
+  }
 }
 
 function undoComplete(name,exactDate){
@@ -2693,6 +2713,13 @@ function renderCancelled() {
     html+='<div class="col"><div class="col-header"><h3>'+k+'</h3><span class="col-count">'+items.length+'</span></div><div class="col-body">'+cards+'</div></div>';
   }
   kb.innerHTML=html;
+}
+
+function undoNBComplete(id){
+  for(var i=0;i<newBiz.length;i++){
+    if(newBiz[i].id===id){newBiz[i].status='In Progress';break;}
+  }
+  saveAll();updateStats();renderCompleted();renderNewBiz();
 }
 
 function undoCancelled(name){var a=accounts[name];if(!a)return;a.status='';updateStats();renderCancelled();renderRenewals();}
@@ -2781,6 +2808,18 @@ function renderNewBiz() {
   updateStats();
 }
 
+function allNBChecked(d) {
+  var NB_CHK=['epicBilled','policySent','certsLender','binder'];
+  var lobs=d.linesOfBusiness||(d.description?[{lob:d.description}]:[]);
+  if(!lobs.length)return false;
+  for(var i=0;i<lobs.length;i++){
+    for(var j=0;j<NB_CHK.length;j++){
+      if(!lobs[i][NB_CHK[j]]||lobs[i][NB_CHK[j]]==='')return false;
+    }
+  }
+  return true;
+}
+
 function toggleNBChk(nbId, lobIdx, field, el, e) {
   if(e) e.stopPropagation();
   var d=null;
@@ -2793,6 +2832,14 @@ function toggleNBChk(nbId, lobIdx, field, el, e) {
   el.className='chk '+(nowDone?'done':'undone');
   el.innerHTML=(nowDone?'✔ ':'')+el.textContent.replace('✔ ','');
   saveAll();
+  // Auto-move to completed if all checkboxes done
+  if(allNBChecked(d)){
+    d.status='Completed';
+    saveAll();
+    renderNewBiz();
+    renderCompleted();
+    showToast('✅ '+d.accountName+' moved to Completed!','green');
+  }
 }
 
 function renderRules() {
