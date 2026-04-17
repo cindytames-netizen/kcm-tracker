@@ -2738,15 +2738,26 @@ function renderNewBiz() {
       var es=d.expirationDate?new Date(d.expirationDate).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}):'';
       var dateStr='🚀 Eff. '+ds+(es?' · 📅 Exp. '+es:'');
       var lobs=d.linesOfBusiness||(d.description?[{lob:d.description,carrier:d.carrier||''}]:[]);
+      var NB_CHK=['epicBilled','policySent','certsLender','binder'];
+      var NB_CHK_LBL={'epicBilled':'Epic Billed','policySent':'Policy Sent','certsLender':'Certs Sent','binder':'Binder Received'};
       var lobHtml='';
       if(lobs.length){
         lobHtml='<div class="pl-list" style="padding:6px 18px 10px;display:none" id="nblob-'+d.id+'">';
         for(var l=0;l<lobs.length;l++){
           var lobName=typeof lobs[l]==='string'?lobs[l]:(lobs[l].lob||'');
           var lobCarrier=typeof lobs[l]==='string'?'':(lobs[l].carrier||'');
-          lobHtml+='<div style="font-size:11px;padding:4px 0;border-bottom:1px solid #EEF5FA;color:var(--text);display:flex;justify-content:space-between">'
-            +'<span>📋 '+lobName+'</span>'
-            +(lobCarrier?'<span style="color:var(--muted);font-size:10px">🏢 '+lobCarrier+'</span>':'')
+          var lobChks='';
+          for(var ci=0;ci<NB_CHK.length;ci++){
+            var ck=NB_CHK[ci];
+            var isDone=lobs[l][ck]===true||lobs[l][ck]==='Yes';
+            lobChks+='<span class="chk '+(isDone?'done':'undone')+'" onclick="toggleNBChk(\''+d.id+'\','+l+',\''+ck+'\',this,event)">'+(isDone?'✔ ':'')+NB_CHK_LBL[ck]+'</span>';
+          }
+          lobHtml+='<div style="padding:6px 0;border-bottom:1px solid #EEF5FA">'
+            +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">'
+              +'<span style="font-size:12px;font-weight:700;color:var(--text)">📋 '+lobName+'</span>'
+              +(lobCarrier?'<span class="pl-carrier">🏢 '+lobCarrier+'</span>':'')
+            +'</div>'
+            +'<div class="pl-checks">'+lobChks+'</div>'
             +'</div>';
         }
         lobHtml+='</div>';
@@ -2768,6 +2779,20 @@ function renderNewBiz() {
   }
   kb.innerHTML=html;
   updateStats();
+}
+
+function toggleNBChk(nbId, lobIdx, field, el, e) {
+  if(e) e.stopPropagation();
+  var d=null;
+  for(var i=0;i<newBiz.length;i++){if(newBiz[i].id===nbId){d=newBiz[i];break;}}
+  if(!d||!d.linesOfBusiness||!d.linesOfBusiness[lobIdx])return;
+  var lob=d.linesOfBusiness[lobIdx];
+  var isDone=lob[field]===true||lob[field]==='Yes';
+  lob[field]=isDone?'':'Yes';
+  var nowDone=!isDone;
+  el.className='chk '+(nowDone?'done':'undone');
+  el.innerHTML=(nowDone?'✔ ':'')+el.textContent.replace('✔ ','');
+  saveAll();
 }
 
 function renderRules() {
