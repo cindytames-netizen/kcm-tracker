@@ -1637,7 +1637,7 @@ function renderTimeOff() {
   }
   // Sort by start date
   var sorted=timeOff.slice().sort(function(a,b){return a.start<b.start?-1:1;});
-  var todayStr=today.toISOString().split('T')[0];
+  var todayStr=today.getFullYear()+'-'+pad(today.getMonth()+1)+'-'+pad(today.getDate());
   var upcoming=sorted.filter(function(t){return t.end>=todayStr;});
   var past=sorted.filter(function(t){return t.end<todayStr;});
   var html='';
@@ -1653,8 +1653,8 @@ function renderTimeOff() {
 }
 
 function toCard(t, isPast) {
-  var s=new Date(t.start+'T00:00:00');
-  var e=new Date(t.end+'T00:00:00');
+  var s=parseLocalDate(t.start);
+  var e=parseLocalDate(t.end);
   var ds=s.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
   var de=e.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
   var days=Math.round((e-s)/86400000)+1;
@@ -2663,8 +2663,8 @@ function renderCompleted() {
     var nbHtml='<div style="margin-top:24px"><div class="col-header" style="margin-bottom:12px"><h3>Completed New Business</h3><span class="col-count">'+completedNB.length+'</span></div><div style="display:flex;flex-wrap:wrap;gap:16px">';
     for(var i=0;i<completedNB.length;i++){
       var d=completedNB[i];
-      var ds=d.effectiveDate?new Date(d.effectiveDate).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}):'—';
-      var es=d.expirationDate?new Date(d.expirationDate).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}):'—';
+      var ds=d.effectiveDate?parseLocalDate(d.effectiveDate).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}):'—';
+      var es=d.expirationDate?parseLocalDate(d.expirationDate).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}):'—';
       nbHtml+='<div class="acard urg-green" style="border-left-color:var(--green);min-width:260px;max-width:340px">'
         +'<div class="comp-banner"><span style="font-size:12px;font-weight:700;color:var(--green-dark)">New Biz Complete</span></div>'
         +'<div class="acard-header"><div class="acard-name">'+(d.accountName||'Unnamed')+'</div>'
@@ -2715,6 +2715,13 @@ function renderCancelled() {
   kb.innerHTML=html;
 }
 
+function parseLocalDate(str) {
+  if(!str) return null;
+  var parts = str.split('-');
+  if(parts.length === 3) return new Date(parseInt(parts[0]), parseInt(parts[1])-1, parseInt(parts[2]));
+  return new Date(str);
+}
+
 function undoNBComplete(id){
   for(var i=0;i<newBiz.length;i++){
     if(newBiz[i].id===id){newBiz[i].status='In Progress';break;}
@@ -2740,7 +2747,7 @@ function renderNewBiz() {
     var k='No Date';
     var sortKey='9999-99';
     if(d.effectiveDate){
-      var dt=new Date(d.effectiveDate);
+      var dt=parseLocalDate(d.effectiveDate);
       if(!isNaN(dt)){
         k=dt.toLocaleDateString('en-US',{month:'long',year:'numeric'});
         sortKey=dt.getFullYear()+'-'+pad(dt.getMonth()+1);
@@ -2761,8 +2768,8 @@ function renderNewBiz() {
     var k=gk[i];var items=groups[k];var cards='';
     for(var j=0;j<items.length;j++){
       var d=items[j];
-      var ds=d.effectiveDate?new Date(d.effectiveDate).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}):'No date';
-      var es=d.expirationDate?new Date(d.expirationDate).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}):'';
+      var ds=d.effectiveDate?parseLocalDate(d.effectiveDate).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}):'No date';
+      var es=d.expirationDate?parseLocalDate(d.expirationDate).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}):'';
       var dateStr='🚀 Eff. '+ds+(es?' · 📅 Exp. '+es:'');
       var lobs=d.linesOfBusiness||(d.description?[{lob:d.description,carrier:d.carrier||''}]:[]);
       var NB_CHK=['epicBilled','policySent','certsLender','binder'];
