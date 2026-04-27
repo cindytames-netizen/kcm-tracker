@@ -1434,170 +1434,64 @@ function gsPushData(retryCount) {
   _gsTimer = setTimeout(function() {
     setSyncStatus('saving...', 'orange');
     var payload = gsBuildPayload();
-    // Split into chunks of max 8000 chars per URL param to stay under limits
+    var data = JSON.stringify({
+      policies: payload.policies,
+      accounts: payload.accounts,
+      newBiz: payload.newBiz,
+      rules: payload.rules,
+      timeOff: payload.timeOff
+    });
+    // Encode data as base64 to send via JSONP GET
+    var encoded = btoa(unescape(encodeURIComponent(data)));
+    // Split into chunks of 5000 chars
     var chunks = [];
-    var fields = ['policies','accounts','newBiz','timeOff'];
-    var current = {};
-    var currentSize = 0;
-    for(var f=0;f<fields.length;f++){
-      var key=fields[f], val=payload[key]||'';
-      var encoded = encodeURIComponent(val);
-      if(currentSize + encoded.length > 7000 && Object.keys(current).length > 0){
-        chunks.push(current);
-        current = {};
-        currentSize = 0;
-      }
-      current[key] = val;
-      currentSize += encoded.length;
+    for (var i = 0; i < encoded.length; i += 5000) {
+      chunks.push(encoded.substring(i, i + 5000));
     }
-    if(Object.keys(current).length > 0) chunks.push(current);
-
-    function saveChunk(idx) {
-      if(idx >= chunks.length){
-        setSyncStatus('synced ✓ ' + new Date().toLocaleTimeString(), 'green');
+    var total = chunks.length;
+    setSyncStatus('saving ('+total+' parts)...', 'orange');
+    function sendChunk(idx) {
+      if (idx >= total) {
+        // All chunks sent - tell server to assemble
+        var url = GS_URL + '?action=assemble&total=' + total;
+        gsJsonpGet(url, function(d) {
+          if (d && d.ok) setSyncStatus('synced ✓ ' + new Date().toLocaleTimeString(), 'green');
+          else {
+            if (d && d.error && d.error.indexOf('Lock') >= 0 && retryCount < 3) {
+              setSyncStatus('retrying...', 'orange');
+              setTimeout(function(){ gsPushData(retryCount+1); }, 5000);
+            } else {
+              setSyncStatus('save error: ' + (d?d.error:'no response'), 'red');
+            }
+          }
+        });
         return;
       }
-      var chunk = chunks[idx];
-      var url = GS_URL + '?action=saveChunk&chunkIdx='+idx+'&chunkTotal='+chunks.length;
-      var keys = Object.keys(chunk);
-      for(var k=0;k<keys.length;k++){
-        url += '&' + keys[k] + '=' + encodeURIComponent(chunk[keys[k]]);
-      }
-      gsJsonpGet(url, function(d){
-        if(!d){ 
-          setSyncStatus('save error', 'red');
-          return; 
-        }
-        if(!d.ok){
-          if(d.error && d.error.indexOf('Lock')>=0 && retryCount < 3){
-            setSyncStatus('retrying...', 'orange');
-            setTimeout(function(){ gsPushData(retryCount+1); }, 5000);
-          } else {
-            setSyncStatus('save error: '+(d.error||''), 'red');
-          }
+      var url = GS_URL + '?action=chunk&idx=' + idx + '&total=' + total + '&data=' + encodeURIComponent(chunks[idx]);
+      gsJsonpGet(url, function(d) {
+        if (!d || !d.ok) {
+          setSyncStatus('save error (part '+(idx+1)+')', 'red');
           return;
         }
-        saveChunk(idx + 1);
+        sendChunk(idx + 1);
       });
     }
-    saveChunk(0);
+    sendChunk(0);
   }, 2000);
 }
+
 function gsPullData(silent) {
   if (!gsEnabled()) return;
   if (!silent) setSyncStatus('loading...', 'gray');
-  // Use script tag JSONP trick to bypass CORS from file://
-  var callbackName = '_gsCallback_' + Date.now();
-  var script = document.createElement('script');
-  window[callbackName] = function(d) {
-    delete window[callbackName];
-    document.body.removeChild(script);
-    if (!d || !d.ok) { setSyncStatus('load error', 'red'); return; }
+  gsJsonpGet(GS_URL + '?action=load', function(d) {
+    if (!d) { setSyncStatus('offline', 'orange'); return; }
+    if (!d.ok || !d.data) { setSyncStatus('no data yet', 'gray'); return; }
     applyGSData(d.data);
     setSyncStatus('synced ✓ ' + new Date().toLocaleTimeString(), 'green');
-  };
-  script.src = GS_URL + '?action=load&callback=' + callbackName;
-  script.onerror = function() {
-    delete window[callbackName];
-    // Fallback to regular fetch
-    fetch(GS_URL + '?action=load', {redirect:'follow'})
-    .then(function(r){ return r.json(); })
-    .then(function(d){
-      if (!d.ok) { setSyncStatus('load error', 'red'); return; }
-      applyGSData(d.data);
-      setSyncStatus('synced ✓ ' + new Date().toLocaleTimeString(), 'green');
-    })
-    .catch(function(){ setSyncStatus('offline — local only', 'orange'); });
-  };
-  document.body.appendChild(script);
+  });
 }
-
-function applyGSData(data) {
-  if (!data) return;
-  if (data.policies) {
-    try {
-      var pd = JSON.parse(data.policies);
-      var flds = ['docuSign','submitted','epicBilled','certsLender','binder','policySent',
-                  'lossRuns','quoteGL','quoteProp','quoteUmb','quoteWC','quoteFlood',
-                  'quoteBond','renewalCarrier','renewalPremium','rewriteOldExpDate','rewriteEffectiveDate','policyCancelled'];
-      for (var i = 0; i < policies.length; i++) {
-        var sv = pd[policies[i].id];
-        if (!sv) continue;
-        for (var f = 0; f < flds.length; f++) {
-          if (sv[flds[f]] !== undefined) policies[i][flds[f]] = sv[flds[f]];
-        }
-      }
-    } catch(e) { console.warn('policies error',e); }
-  }
-  if (data.accounts) {
-    try {
-      var ad = JSON.parse(data.accounts);
-      var ns = Object.keys(ad);
-      for (var i = 0; i < ns.length; i++) {
-        var n = ns[i];
-        if (!accounts[n]) continue;
-        var sa = ad[n];
-        accounts[n].status = sa.status||'';
-        // Merge notes — combine server + local, deduplicate by date+text
-        var mergedNotes = sa.notesLog||[];
-        var localNotes = accounts[n].notesLog||[];
-        for (var ni = 0; ni < localNotes.length; ni++) {
-          var ln = localNotes[ni];
-          var exists = mergedNotes.some(function(sn){ return sn.date===ln.date && sn.text===ln.text; });
-          if (!exists) mergedNotes.unshift(ln);
-        }
-        accounts[n].notesLog = mergedNotes;
-        // Merge followupLog the same way
-        var mergedFL = sa.followupLog||[];
-        var localFL = accounts[n].followupLog||[];
-        for (var fi = 0; fi < localFL.length; fi++) {
-          var lf = localFL[fi];
-          var fexists = mergedFL.some(function(sf){ return sf.date===lf.date && sf.note===lf.note; });
-          if (!fexists) mergedFL.unshift(lf);
-        }
-        accounts[n].followupLog = mergedFL;
-        accounts[n].renewalTotalPremium = sa.renewalTotalPremium||'';
-        accounts[n].dateStatuses = sa.dateStatuses||{};
-        accounts[n].dateGroupPremiums = sa.dateGroupPremiums||{};
-        accounts[n].dateNotes = sa.dateNotes||{};
-        accounts[n].dateFollowups = sa.dateFollowups||{};
-      }
-    } catch(e) { console.warn('accounts error',e); }
-  }
-  if (data.newBiz) { try { var nb=JSON.parse(data.newBiz); if(Array.isArray(nb)) newBiz=nb; } catch(e){} }
-  if (data.timeOff) { try { var to=JSON.parse(data.timeOff); if(Array.isArray(to)) timeOff=to; } catch(e){} }
-
-  // Background auto-sync: NEVER re-render, just update data silently
-  // Only re-render on manual Pull click
-  if (window._isSilentSync) {
-    setSyncStatus('synced ✓ ' + new Date().toLocaleTimeString(), 'green');
-    return;
-  }
-  updateStats(); renderRenewals(); renderCompleted(); renderActions(); renderNewBiz();
-}
-
-// Track user activity — any click, keypress, or focus = active for 10 seconds
-window._userIsActive = false;
-window._userActivityTimer = null;
-function _markUserActive() {
-  window._userIsActive = true;
-  clearTimeout(window._userActivityTimer);
-  window._userActivityTimer = setTimeout(function(){
-    window._userIsActive = false;
-    // If a render was pending, do it now
-    if(window._pendingRender) {
-      window._pendingRender = false;
-      updateStats(); renderRenewals(); renderCompleted(); renderActions(); renderNewBiz();
-    }
-  }, 10000); // 10 seconds of inactivity before re-render is allowed
-}
-document.addEventListener('mousedown', _markUserActive);
-document.addEventListener('keydown', _markUserActive);
-document.addEventListener('focus', _markUserActive, true);
-document.addEventListener('input', _markUserActive);
 
 function syncNow() {
-  // Manual pull — allow full re-render
   window._isSilentSync = false;
   setSyncStatus('pulling...', 'orange');
   gsPullData(false);
@@ -1605,10 +1499,8 @@ function syncNow() {
 
 function initGoogleSync() {
   if (!gsEnabled()) { setSyncStatus('not set up', 'gray'); return; }
-  // Initial load — render fully
   window._isSilentSync = false;
   gsPullData(false);
-  // Background auto-sync — silent, no re-render
   setInterval(function(){
     window._isSilentSync = true;
     gsPullData(true);
