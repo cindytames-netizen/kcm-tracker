@@ -1455,10 +1455,12 @@ function gsPushData(retryCount) {
       }
       gsJsonpGet(url, function(d){
         if(!d){ 
-          setSyncStatus('save error', 'red'); 
+          setSyncStatus('save error', 'red');
+          alert('Chunk ' + idx + ' got null response');
           return; 
         }
         if(!d.ok){
+          alert('Chunk ' + idx + ' error: ' + JSON.stringify(d));
           if(d.error && d.error.indexOf('Lock')>=0 && retryCount < 3){
             setSyncStatus('retrying...', 'orange');
             setTimeout(function(){ gsPushData(retryCount+1); }, 5000);
