@@ -1435,6 +1435,7 @@ function gsPushData(retryCount) {
     })
     .catch(function(e){
       setSyncStatus('save error', 'red');
+      alert('Fetch failed: ' + e.message + ' | ' + e.toString());
       console.error('Push failed:', e);
     });
   }, 2000);
