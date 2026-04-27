@@ -1425,9 +1425,9 @@ function gsPushData(retryCount) {
         else if(d.error && d.error.indexOf('Lock') >= 0 && retryCount < 3) {
           // Lock timeout — retry after 3 seconds
           setSyncStatus('retrying...', 'orange');
-          setTimeout(function(){ gsPushData(retryCount + 1); }, 3000);
+          setTimeout(function(){ gsPushData(retryCount + 1); }, 5000);
         }
-        else { setSyncStatus('save error: ' + (d.error||''), 'red'); console.error('Save error:', d); }
+        else { setSyncStatus('save error: ' + (d.error||'unknown'), 'red'); console.error('Save error:', d); }
       } catch(e) {
         if(t && t.length > 0) setSyncStatus('synced ✓ ' + new Date().toLocaleTimeString(), 'green');
         else setSyncStatus('save error', 'red');
@@ -1437,7 +1437,7 @@ function gsPushData(retryCount) {
       setSyncStatus('save error', 'red');
       console.error('Push failed:', e);
     });
-  }, 800);
+  }, 2000);
 }
 function gsPullData(silent) {
   if (!gsEnabled()) return;
