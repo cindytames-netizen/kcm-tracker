@@ -1455,13 +1455,13 @@ function gsPushData(retryCount) {
       chunks.push(encoded.substring(i, i + 5000));
     }
     var total = chunks.length;
+    var sessionId = Date.now().toString(36); // unique session ID
     setSyncStatus('saving ('+total+' parts)...', 'orange');
     function sendChunk(idx, attempt) {
       attempt = attempt || 0;
       if (idx >= total) {
-        // All chunks sent - tell server to assemble
         setTimeout(function(){
-          var url = GS_URL + '?action=assemble&total=' + total;
+          var url = GS_URL + '?action=assemble&total=' + total + '&session=' + sessionId;
           gsJsonpGet(url, function(d) {
             if (d && d.ok) setSyncStatus('synced \u2713 ' + new Date().toLocaleTimeString(), 'green');
             else {
@@ -1473,22 +1473,20 @@ function gsPushData(retryCount) {
               }
             }
           });
-        }, 500);
+        }, 800);
         return;
       }
       setSyncStatus('saving part '+(idx+1)+'/'+total+'...', 'orange');
-      var url = GS_URL + '?action=chunk&idx=' + idx + '&total=' + total + '&data=' + encodeURIComponent(chunks[idx]);
+      var url = GS_URL + '?action=chunk&session=' + sessionId + '&idx=' + idx + '&total=' + total + '&data=' + encodeURIComponent(chunks[idx]);
       gsJsonpGet(url, function(d) {
         if (!d || !d.ok) {
           if (attempt < 3) {
-            // Retry this chunk
             setTimeout(function(){ sendChunk(idx, attempt+1); }, 2000);
           } else {
             setSyncStatus('save error (part '+(idx+1)+')', 'red');
           }
           return;
         }
-        // Small delay between chunks to avoid server overload
         setTimeout(function(){ sendChunk(idx + 1); }, 300);
       });
     }
