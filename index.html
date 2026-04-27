@@ -1453,6 +1453,7 @@ function gsPushData(retryCount) {
       for(var k=0;k<keys.length;k++){
         url += '&' + keys[k] + '=' + encodeURIComponent(chunk[keys[k]]);
       }
+      if(idx===0) alert('Chunk 0 URL length: ' + url.length + ' chars. Keys: ' + Object.keys(chunk).join(','));
       gsJsonpGet(url, function(d){
         if(!d){ 
           setSyncStatus('save error', 'red');
