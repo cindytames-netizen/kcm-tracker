@@ -1441,8 +1441,14 @@ function gsPushData(retryCount) {
       rules: payload.rules,
       timeOff: payload.timeOff
     });
-    // Encode data as base64 to send via JSONP GET
-    var encoded = btoa(unescape(encodeURIComponent(data)));
+    // Encode data safely for URL transmission
+    var encoded;
+    try {
+      encoded = btoa(unescape(encodeURIComponent(data)));
+    } catch(e) {
+      // Fallback - strip non-ASCII chars
+      encoded = btoa(data.replace(/[^\x00-\x7F]/g, '?'));
+    }
     // Split into chunks of 5000 chars
     var chunks = [];
     for (var i = 0; i < encoded.length; i += 5000) {
