@@ -1398,6 +1398,25 @@ function gsBuildPayload() {
   };
 }
 
+function gsJsonpGet(url, callback) {
+  var cbName = '_gsCb_' + Date.now() + '_' + Math.floor(Math.random()*99999);
+  var script = document.createElement('script');
+  var done = false;
+  window[cbName] = function(d) {
+    if(done) return; done = true;
+    delete window[cbName];
+    if(script.parentNode) document.body.removeChild(script);
+    callback(d);
+  };
+  script.onerror = function() {
+    if(done) return; done = true;
+    delete window[cbName];
+    callback(null);
+  };
+  script.src = url + (url.indexOf('?')>=0?'&':'?') + 'callback=' + cbName;
+  document.body.appendChild(script);
+}
+
 function gsPushData(retryCount) {
   if (!gsEnabled()) return;
   retryCount = retryCount || 0;
@@ -1405,39 +1424,53 @@ function gsPushData(retryCount) {
   _gsTimer = setTimeout(function() {
     setSyncStatus('saving...', 'orange');
     var payload = gsBuildPayload();
-    fetch(GS_URL, {
-      method: 'POST',
-      headers: {'Content-Type': 'text/plain;charset=utf-8'},
-      body: JSON.stringify({
-        action: 'save',
-        policies: payload.policies,
-        accounts: payload.accounts,
-        newBiz: payload.newBiz,
-        rules: payload.rules,
-        timeOff: payload.timeOff
-      })
-    })
-    .then(function(r){ return r.text(); })
-    .then(function(t){
-      try {
-        var d = JSON.parse(t);
-        if(d.ok) setSyncStatus('synced ✓ ' + new Date().toLocaleTimeString(), 'green');
-        else if(d.error && d.error.indexOf('Lock') >= 0 && retryCount < 3) {
-          // Lock timeout — retry after 3 seconds
-          setSyncStatus('retrying...', 'orange');
-          setTimeout(function(){ gsPushData(retryCount + 1); }, 5000);
-        }
-        else { setSyncStatus('save error: ' + (d.error||'unknown'), 'red'); alert('Save error: ' + JSON.stringify(d)); console.error('Save error:', d); }
-      } catch(e) {
-        if(t && t.length > 0) setSyncStatus('synced ✓ ' + new Date().toLocaleTimeString(), 'green');
-        else setSyncStatus('save error', 'red');
+    // Split into chunks of max 8000 chars per URL param to stay under limits
+    var chunks = [];
+    var fields = ['policies','accounts','newBiz','timeOff'];
+    var current = {};
+    var currentSize = 0;
+    for(var f=0;f<fields.length;f++){
+      var key=fields[f], val=payload[key]||'';
+      var encoded = encodeURIComponent(val);
+      if(currentSize + encoded.length > 7000 && Object.keys(current).length > 0){
+        chunks.push(current);
+        current = {};
+        currentSize = 0;
       }
-    })
-    .catch(function(e){
-      setSyncStatus('save error', 'red');
-      alert('Fetch failed: ' + e.message + ' | ' + e.toString());
-      console.error('Push failed:', e);
-    });
+      current[key] = val;
+      currentSize += encoded.length;
+    }
+    if(Object.keys(current).length > 0) chunks.push(current);
+
+    function saveChunk(idx) {
+      if(idx >= chunks.length){
+        setSyncStatus('synced ✓ ' + new Date().toLocaleTimeString(), 'green');
+        return;
+      }
+      var chunk = chunks[idx];
+      var url = GS_URL + '?action=saveChunk&chunkIdx='+idx+'&chunkTotal='+chunks.length;
+      var keys = Object.keys(chunk);
+      for(var k=0;k<keys.length;k++){
+        url += '&' + keys[k] + '=' + encodeURIComponent(chunk[keys[k]]);
+      }
+      gsJsonpGet(url, function(d){
+        if(!d){ 
+          setSyncStatus('save error', 'red'); 
+          return; 
+        }
+        if(!d.ok){
+          if(d.error && d.error.indexOf('Lock')>=0 && retryCount < 3){
+            setSyncStatus('retrying...', 'orange');
+            setTimeout(function(){ gsPushData(retryCount+1); }, 5000);
+          } else {
+            setSyncStatus('save error: '+(d.error||''), 'red');
+          }
+          return;
+        }
+        saveChunk(idx + 1);
+      });
+    }
+    saveChunk(0);
   }, 2000);
 }
 function gsPullData(silent) {
