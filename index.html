@@ -1427,7 +1427,7 @@ function gsPushData(retryCount) {
           setSyncStatus('retrying...', 'orange');
           setTimeout(function(){ gsPushData(retryCount + 1); }, 5000);
         }
-        else { setSyncStatus('save error: ' + (d.error||'unknown'), 'red'); console.error('Save error:', d); }
+        else { setSyncStatus('save error: ' + (d.error||'unknown'), 'red'); alert('Save error: ' + JSON.stringify(d)); console.error('Save error:', d); }
       } catch(e) {
         if(t && t.length > 0) setSyncStatus('synced ✓ ' + new Date().toLocaleTimeString(), 'green');
         else setSyncStatus('save error', 'red');
