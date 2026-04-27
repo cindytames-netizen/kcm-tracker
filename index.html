@@ -1365,28 +1365,38 @@ function gsEnabled() {
 }
 
 function gsBuildPayload() {
+  // Only save policies that have at least one non-empty field
   var pd = {};
+  var CHK_FIELDS = ['docuSign','submitted','epicBilled','certsLender','binder','policySent',
+    'lossRuns','quoteGL','quoteProp','quoteUmb','quoteWC','quoteFlood','quoteBond',
+    'renewalCarrier','renewalPremium','rewriteOldExpDate','rewriteEffectiveDate','policyCancelled'];
   for (var i = 0; i < policies.length; i++) {
     var p = policies[i];
-    pd[p.id] = {
-      docuSign:p.docuSign||'', submitted:p.submitted||'', epicBilled:p.epicBilled||'',
-      certsLender:p.certsLender||'', binder:p.binder||'', policySent:p.policySent||'',
-      lossRuns:p.lossRuns||'', quoteGL:p.quoteGL||'', quoteProp:p.quoteProp||'',
-      quoteUmb:p.quoteUmb||'', quoteWC:p.quoteWC||'', quoteFlood:p.quoteFlood||'',
-      quoteBond:p.quoteBond||'', renewalCarrier:p.renewalCarrier||'',
-      renewalPremium:p.renewalPremium||''
-    };
+    var hasData = false;
+    var entry = {};
+    for (var j = 0; j < CHK_FIELDS.length; j++) {
+      var v = p[CHK_FIELDS[j]];
+      if (v && v !== '' && v !== false) { entry[CHK_FIELDS[j]] = v; hasData = true; }
+    }
+    if (hasData) pd[p.id] = entry;
   }
+  // Only save accounts with actual data
   var ad = {};
   var ns = Object.keys(accounts);
   for (var i = 0; i < ns.length; i++) {
     var n = ns[i];
     var a = accounts[n];
-    ad[n] = {
-      status: a.status||'', followupLog: a.followupLog||[],
-      notesLog: a.notesLog||[], renewalTotalPremium: a.renewalTotalPremium||'',
-      dateStatuses: a.dateStatuses||{}, dateGroupPremiums: a.dateGroupPremiums||{}, dateNotes: a.dateNotes||{}, dateFollowups: a.dateFollowups||{}
-    };
+    var hasAcctData = a.status || (a.followupLog&&a.followupLog.length) || 
+      (a.notesLog&&a.notesLog.length) || (a.dateStatuses&&Object.keys(a.dateStatuses).length) ||
+      (a.dateNotes&&Object.keys(a.dateNotes).length) || (a.dateFollowups&&Object.keys(a.dateFollowups).length);
+    if (hasAcctData) {
+      ad[n] = {
+        status: a.status||'', followupLog: a.followupLog||[],
+        notesLog: a.notesLog||[], renewalTotalPremium: a.renewalTotalPremium||'',
+        dateStatuses: a.dateStatuses||{}, dateGroupPremiums: a.dateGroupPremiums||{},
+        dateNotes: a.dateNotes||{}, dateFollowups: a.dateFollowups||{}
+      };
+    }
   }
   return {
     action: 'save',
@@ -1453,15 +1463,12 @@ function gsPushData(retryCount) {
       for(var k=0;k<keys.length;k++){
         url += '&' + keys[k] + '=' + encodeURIComponent(chunk[keys[k]]);
       }
-      if(idx===0) alert('Chunk 0 URL length: ' + url.length + ' chars. Keys: ' + Object.keys(chunk).join(','));
       gsJsonpGet(url, function(d){
         if(!d){ 
           setSyncStatus('save error', 'red');
-          alert('Chunk ' + idx + ' got null response');
           return; 
         }
         if(!d.ok){
-          alert('Chunk ' + idx + ' error: ' + JSON.stringify(d));
           if(d.error && d.error.indexOf('Lock')>=0 && retryCount < 3){
             setSyncStatus('retrying...', 'orange');
             setTimeout(function(){ gsPushData(retryCount+1); }, 5000);
