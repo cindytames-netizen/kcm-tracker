@@ -1409,31 +1409,46 @@ function gsBuildPayload() {
 }
 
 function gsJsonpGet(url, callback) {
-  var cbName = '_gsCb_' + Date.now() + '_' + Math.floor(Math.random()*99999);
-  var script = document.createElement('script');
+  // Use iframe instead of script tag - iframes follow GAS redirects
+  var iframeId = '_gsIframe_' + Date.now();
+  var iframe = document.createElement('iframe');
+  iframe.id = iframeId;
+  iframe.style.display = 'none';
   var done = false;
-  // 60 second timeout
   var timer = setTimeout(function(){
     if(done) return; done = true;
-    delete window[cbName];
-    if(script.parentNode) document.body.removeChild(script);
+    if(iframe.parentNode) document.body.removeChild(iframe);
     callback(null);
   }, 60000);
-  window[cbName] = function(d) {
-    if(done) return; done = true;
-    clearTimeout(timer);
-    delete window[cbName];
-    if(script.parentNode) document.body.removeChild(script);
-    callback(d);
+  iframe.onload = function() {
+    if(done) return;
+    try {
+      var text = iframe.contentDocument.body.innerText || iframe.contentDocument.body.textContent;
+      // Extract JSON from JSONP response e.g. callback({...})
+      var match = text.match(/[a-zA-Z_$][a-zA-Z0-9_$]*\s*\(([\s\S]*)\)/);
+      var json = match ? match[1] : text;
+      var d = JSON.parse(json);
+      done = true;
+      clearTimeout(timer);
+      if(iframe.parentNode) document.body.removeChild(iframe);
+      callback(d);
+    } catch(e) {
+      done = true;
+      clearTimeout(timer);
+      if(iframe.parentNode) document.body.removeChild(iframe);
+      callback(null);
+    }
   };
-  script.onerror = function() {
+  iframe.onerror = function() {
     if(done) return; done = true;
     clearTimeout(timer);
-    delete window[cbName];
+    if(iframe.parentNode) document.body.removeChild(iframe);
     callback(null);
   };
-  script.src = url + (url.indexOf('?')>=0?'&':'?') + 'callback=' + cbName;
-  document.body.appendChild(script);
+  // Add callback param to URL
+  var cbName = '_cb_' + Date.now();
+  iframe.src = url + (url.indexOf('?')>=0?'&':'?') + 'callback=' + cbName;
+  document.body.appendChild(iframe);
 }
 
 function gsPushData(retryCount) {
