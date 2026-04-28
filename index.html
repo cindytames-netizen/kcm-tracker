@@ -1412,13 +1412,13 @@ function gsJsonpGet(url, callback) {
   var cbName = '_gsCb_' + Date.now() + '_' + Math.floor(Math.random()*99999);
   var script = document.createElement('script');
   var done = false;
-  // 30 second timeout
+  // 60 second timeout
   var timer = setTimeout(function(){
     if(done) return; done = true;
     delete window[cbName];
     if(script.parentNode) document.body.removeChild(script);
     callback(null);
-  }, 30000);
+  }, 60000);
   window[cbName] = function(d) {
     if(done) return; done = true;
     clearTimeout(timer);
@@ -1513,12 +1513,24 @@ function gsPullData(silent) {
       setSyncStatus('loading... ' + elapsed + 's', 'gray');
     }, 1000);
   }
-  gsJsonpGet(GS_URL + '?action=load', function(d) {
+  // Try fetch first (works from GitHub Pages), fallback to JSONP
+  fetch(GS_URL + '?action=load')
+  .then(function(r){ return r.json(); })
+  .then(function(d){
     clearInterval(window._loadTimer);
-    if (!d) { setSyncStatus('offline', 'orange'); return; }
-    if (!d.ok || !d.data) { setSyncStatus('no data yet', 'gray'); return; }
+    if (!d || !d.ok || !d.data) { setSyncStatus('no data yet', 'gray'); return; }
     applyGSData(d.data);
     setSyncStatus('synced \u2713 ' + new Date().toLocaleTimeString(), 'green');
+  })
+  .catch(function(){
+    // Fallback to JSONP if fetch fails
+    gsJsonpGet(GS_URL + '?action=load', function(d) {
+      clearInterval(window._loadTimer);
+      if (!d) { setSyncStatus('offline', 'orange'); return; }
+      if (!d.ok || !d.data) { setSyncStatus('no data yet', 'gray'); return; }
+      applyGSData(d.data);
+      setSyncStatus('synced \u2713 ' + new Date().toLocaleTimeString(), 'green');
+    });
   });
 }
 
