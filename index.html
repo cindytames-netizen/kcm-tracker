@@ -1408,41 +1408,44 @@ function gsBuildPayload() {
   };
 }
 
+function gsScriptTag(url, callback) {
+  // Script tags follow GAS redirects to googleusercontent.com which allows JSONP
+  var cbName = '_gsCb_' + Date.now() + '_' + Math.floor(Math.random()*99999);
+  var script = document.createElement('script');
+  var done = false;
+  var timer = setTimeout(function(){
+    if(done) return; done = true;
+    delete window[cbName];
+    if(script.parentNode) document.body.removeChild(script);
+    callback(null);
+  }, 60000);
+  window[cbName] = function(d) {
+    if(done) return; done = true;
+    clearTimeout(timer);
+    delete window[cbName];
+    if(script.parentNode) document.body.removeChild(script);
+    callback(d);
+  };
+  script.onerror = function() {
+    if(done) return; done = true;
+    clearTimeout(timer);
+    delete window[cbName];
+    callback(null);
+  };
+  script.src = url + (url.indexOf('?')>=0?'&':'?') + 'callback=' + cbName;
+  document.body.appendChild(script);
+}
+
 function gsJsonpGet(url, callback) {
   var isLoad = url.indexOf('action=load') >= 0;
   if (isLoad) {
-    // Use allorigins proxy to bypass Google Apps Script CORS redirect issue
-    var proxyUrl = 'https://api.allorigins.win/raw?url=' + encodeURIComponent(url);
-    fetch(proxyUrl)
-    .then(function(r) { return r.text(); })
-    .then(function(text) {
-      try {
-        var match = text.match(/[a-zA-Z_$][a-zA-Z0-9_$]*\s*\(([\s\S]*)\)/);
-        var json = match ? match[1] : text;
-        callback(JSON.parse(json));
-      } catch(e) {
-        console.error('Parse error:', e);
-        callback(null);
-      }
-    })
-    .catch(function(e) {
-      console.error('Fetch error:', e);
-      callback(null);
-    });
+    // Use script tag for loading - follows GAS redirects and executes JSONP
+    gsScriptTag(url, callback);
   } else {
-    // For chunk saving use no-cors - just need delivery
+    // For chunk saving use no-cors POST - data gets through without CORS issues
     fetch(url, {mode: 'no-cors'})
-    .then(function(r) {
-      if(r.type === 'opaque') { callback({ok: true}); return; }
-      return r.text().then(function(text) {
-        try {
-          var match = text.match(/[a-zA-Z_$][a-zA-Z0-9_$]*\s*\(([\s\S]*)\)/);
-          var json = match ? match[1] : text;
-          callback(JSON.parse(json));
-        } catch(e) { callback({ok: true}); }
-      });
-    })
-    .catch(function(e) { callback(null); });
+    .then(function() { callback({ok: true}); })
+    .catch(function() { callback(null); });
   }
 }
 
@@ -1480,8 +1483,8 @@ function gsPushData(retryCount) {
       attempt = attempt || 0;
       if (idx >= total) {
         setTimeout(function(){
-          var url = GS_URL + '?action=assemble&total=' + total + '&session=' + sessionId;
-          gsJsonpGet(url, function(d) {
+          // Assemble via script tag (needs JSONP response)
+          gsScriptTag(GS_URL + '?action=assemble&total=' + total + '&session=' + sessionId, function(d) {
             if (d && d.ok) setSyncStatus('synced \u2713 ' + new Date().toLocaleTimeString(), 'green');
             else {
               if (d && d.error && d.error.indexOf('Lock') >= 0 && retryCount < 3) {
@@ -1496,17 +1499,23 @@ function gsPushData(retryCount) {
         return;
       }
       setSyncStatus('saving part '+(idx+1)+'/'+total+'...', 'orange');
-      var url = GS_URL + '?action=chunk&session=' + sessionId + '&idx=' + idx + '&total=' + total + '&data=' + encodeURIComponent(chunks[idx]);
-      gsJsonpGet(url, function(d) {
-        if (!d || !d.ok) {
-          if (attempt < 3) {
-            setTimeout(function(){ sendChunk(idx, attempt+1); }, 2000);
-          } else {
-            setSyncStatus('save error (part '+(idx+1)+')', 'red');
-          }
-          return;
+      // Send chunk via no-cors POST with text/plain (bypasses CORS preflight)
+      fetch(GS_URL, {
+        method: 'POST',
+        mode: 'no-cors',
+        headers: {'Content-Type': 'text/plain;charset=utf-8'},
+        body: JSON.stringify({action: 'chunk', session: sessionId, idx: idx, total: total, data: chunks[idx]})
+      })
+      .then(function() {
+        // no-cors is opaque - assume success and continue
+        setTimeout(function(){ sendChunk(idx + 1); }, 500);
+      })
+      .catch(function() {
+        if (attempt < 3) {
+          setTimeout(function(){ sendChunk(idx, attempt+1); }, 2000);
+        } else {
+          setSyncStatus('save error (part '+(idx+1)+')', 'red');
         }
-        setTimeout(function(){ sendChunk(idx + 1); }, 300);
       });
     }
     sendChunk(0);
