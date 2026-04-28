@@ -2062,15 +2062,11 @@ function makeCard(a,visiblePols,groupKey) {
   // Use per-date-group notes/followups if exactDate exists, otherwise fall back to account-level
   if(!a.dateNotes)a.dateNotes={};
   if(!a.dateFollowups)a.dateFollowups={};
-  if(exactDate){
-    if(!a.dateNotes[exactDate])a.dateNotes[exactDate]=[];
-    if(!a.dateFollowups[exactDate])a.dateFollowups[exactDate]=[];
-  }
   if(!a.followupLog)a.followupLog=[];
   if(!a.notesLog)a.notesLog=[];
   // Show notes for this specific date group only
-  var fl=exactDate?a.dateFollowups[exactDate]:a.followupLog;
-  var nl=exactDate?a.dateNotes[exactDate]:a.notesLog;
+  var fl=exactDate?(a.dateFollowups[exactDate]||[]):a.followupLog;
+  var nl=exactDate?(a.dateNotes[exactDate]||[]):a.notesLog;
   // Use a simple numeric ID to avoid any string escaping issues
   var nid=++window._noteIdCounter;
   window._noteRegistry[nid]={acct:a, exactDate:exactDate}; // store object + date
