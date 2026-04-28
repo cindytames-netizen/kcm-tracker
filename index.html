@@ -1513,24 +1513,12 @@ function gsPullData(silent) {
       setSyncStatus('loading... ' + elapsed + 's', 'gray');
     }, 1000);
   }
-  // Try fetch first (works from GitHub Pages), fallback to JSONP
-  fetch(GS_URL + '?action=load')
-  .then(function(r){ return r.json(); })
-  .then(function(d){
+  gsJsonpGet(GS_URL + '?action=load', function(d) {
     clearInterval(window._loadTimer);
-    if (!d || !d.ok || !d.data) { setSyncStatus('no data yet', 'gray'); return; }
+    if (!d) { setSyncStatus('offline - try Pull again', 'orange'); return; }
+    if (!d.ok || !d.data) { setSyncStatus('no data yet', 'gray'); return; }
     applyGSData(d.data);
     setSyncStatus('synced \u2713 ' + new Date().toLocaleTimeString(), 'green');
-  })
-  .catch(function(){
-    // Fallback to JSONP if fetch fails
-    gsJsonpGet(GS_URL + '?action=load', function(d) {
-      clearInterval(window._loadTimer);
-      if (!d) { setSyncStatus('offline', 'orange'); return; }
-      if (!d.ok || !d.data) { setSyncStatus('no data yet', 'gray'); return; }
-      applyGSData(d.data);
-      setSyncStatus('synced \u2713 ' + new Date().toLocaleTimeString(), 'green');
-    });
   });
 }
 
