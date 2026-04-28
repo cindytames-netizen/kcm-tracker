@@ -1411,8 +1411,8 @@ function gsBuildPayload() {
 function gsJsonpGet(url, callback) {
   var isLoad = url.indexOf('action=load') >= 0;
   if (isLoad) {
-    // Use corsproxy.io to bypass Google Apps Script CORS redirect issue for loading
-    var proxyUrl = 'https://corsproxy.io/?' + encodeURIComponent(url);
+    // Use allorigins proxy to bypass Google Apps Script CORS redirect issue
+    var proxyUrl = 'https://api.allorigins.win/raw?url=' + encodeURIComponent(url);
     fetch(proxyUrl)
     .then(function(r) { return r.text(); })
     .then(function(text) {
