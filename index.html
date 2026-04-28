@@ -1523,6 +1523,50 @@ function gsPushData(retryCount) {
   }, 2000);
 }
 
+function applyGSData(data) {
+  if (!data) return;
+  if (data.policies) {
+    try {
+      var pd = JSON.parse(data.policies);
+      var flds = ['docuSign','submitted','epicBilled','certsLender','binder','policySent',
+                  'lossRuns','quoteGL','quoteProp','quoteUmb','quoteWC','quoteFlood',
+                  'quoteBond','renewalCarrier','renewalPremium','rewriteOldExpDate',
+                  'rewriteEffectiveDate','policyCancelled'];
+      for (var i = 0; i < policies.length; i++) {
+        var sv = pd[policies[i].id];
+        if (!sv) continue;
+        for (var f = 0; f < flds.length; f++) {
+          if (sv[flds[f]] !== undefined) policies[i][flds[f]] = sv[flds[f]];
+        }
+      }
+    } catch(e) { console.warn('policies error',e); }
+  }
+  if (data.accounts) {
+    try {
+      var ad = JSON.parse(data.accounts);
+      var ns = Object.keys(ad);
+      for (var i = 0; i < ns.length; i++) {
+        var n = ns[i];
+        if (!accounts[n]) continue;
+        var sa = ad[n];
+        if (sa.status !== undefined) accounts[n].status = sa.status;
+        if (sa.followupLog) accounts[n].followupLog = sa.followupLog;
+        if (sa.notesLog) accounts[n].notesLog = sa.notesLog;
+        if (sa.renewalTotalPremium !== undefined) accounts[n].renewalTotalPremium = sa.renewalTotalPremium;
+        if (sa.dateStatuses) accounts[n].dateStatuses = sa.dateStatuses;
+        if (sa.dateGroupPremiums) accounts[n].dateGroupPremiums = sa.dateGroupPremiums;
+        if (sa.dateNotes) accounts[n].dateNotes = sa.dateNotes;
+        if (sa.dateFollowups) accounts[n].dateFollowups = sa.dateFollowups;
+      }
+    } catch(e) { console.warn('accounts error',e); }
+  }
+  if (data.newBiz) { try { var nb=JSON.parse(data.newBiz); if(Array.isArray(nb)) newBiz=nb; } catch(e){} }
+  if (data.timeOff) { try { var to=JSON.parse(data.timeOff); if(Array.isArray(to)) timeOff=to; } catch(e){} }
+  if (window._isSilentSync) return;
+  updateStats(); renderRenewals(); renderCompleted(); renderActions(); renderNewBiz();
+  if(typeof renderTimeOff === 'function') renderTimeOff();
+}
+
 function gsPullData(silent) {
   if (!gsEnabled()) return;
   if (!silent) {
