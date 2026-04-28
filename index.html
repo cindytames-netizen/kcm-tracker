@@ -1412,14 +1412,23 @@ function gsJsonpGet(url, callback) {
   var cbName = '_gsCb_' + Date.now() + '_' + Math.floor(Math.random()*99999);
   var script = document.createElement('script');
   var done = false;
+  // 30 second timeout
+  var timer = setTimeout(function(){
+    if(done) return; done = true;
+    delete window[cbName];
+    if(script.parentNode) document.body.removeChild(script);
+    callback(null);
+  }, 30000);
   window[cbName] = function(d) {
     if(done) return; done = true;
+    clearTimeout(timer);
     delete window[cbName];
     if(script.parentNode) document.body.removeChild(script);
     callback(d);
   };
   script.onerror = function() {
     if(done) return; done = true;
+    clearTimeout(timer);
     delete window[cbName];
     callback(null);
   };
@@ -1496,12 +1505,20 @@ function gsPushData(retryCount) {
 
 function gsPullData(silent) {
   if (!gsEnabled()) return;
-  if (!silent) setSyncStatus('loading...', 'gray');
+  if (!silent) {
+    setSyncStatus('loading...', 'gray');
+    var startTime = Date.now();
+    window._loadTimer = setInterval(function(){
+      var elapsed = Math.round((Date.now()-startTime)/1000);
+      setSyncStatus('loading... ' + elapsed + 's', 'gray');
+    }, 1000);
+  }
   gsJsonpGet(GS_URL + '?action=load', function(d) {
+    clearInterval(window._loadTimer);
     if (!d) { setSyncStatus('offline', 'orange'); return; }
     if (!d.ok || !d.data) { setSyncStatus('no data yet', 'gray'); return; }
     applyGSData(d.data);
-    setSyncStatus('synced ✓ ' + new Date().toLocaleTimeString(), 'green');
+    setSyncStatus('synced \u2713 ' + new Date().toLocaleTimeString(), 'green');
   });
 }
 
@@ -1515,10 +1532,15 @@ function initGoogleSync() {
   if (!gsEnabled()) { setSyncStatus('not set up', 'gray'); return; }
   window._isSilentSync = false;
   gsPullData(false);
+  // Background auto-sync every 60 seconds — silent, no re-render
   setInterval(function(){
     window._isSilentSync = true;
     gsPullData(true);
   }, 60000);
+  // Keep-alive ping every 4 minutes to keep Apps Script warm
+  setInterval(function(){
+    gsJsonpGet(GS_URL + '?action=ping', function(){});
+  }, 240000);
 }
 
 // ─────────────────────────────────────────────
