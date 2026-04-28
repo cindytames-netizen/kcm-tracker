@@ -1409,46 +1409,41 @@ function gsBuildPayload() {
 }
 
 function gsJsonpGet(url, callback) {
-  // Use iframe instead of script tag - iframes follow GAS redirects
-  var iframeId = '_gsIframe_' + Date.now();
-  var iframe = document.createElement('iframe');
-  iframe.id = iframeId;
-  iframe.style.display = 'none';
-  var done = false;
-  var timer = setTimeout(function(){
-    if(done) return; done = true;
-    if(iframe.parentNode) document.body.removeChild(iframe);
-    callback(null);
-  }, 60000);
-  iframe.onload = function() {
-    if(done) return;
-    try {
-      var text = iframe.contentDocument.body.innerText || iframe.contentDocument.body.textContent;
-      // Extract JSON from JSONP response e.g. callback({...})
-      var match = text.match(/[a-zA-Z_$][a-zA-Z0-9_$]*\s*\(([\s\S]*)\)/);
-      var json = match ? match[1] : text;
-      var d = JSON.parse(json);
-      done = true;
-      clearTimeout(timer);
-      if(iframe.parentNode) document.body.removeChild(iframe);
-      callback(d);
-    } catch(e) {
-      done = true;
-      clearTimeout(timer);
-      if(iframe.parentNode) document.body.removeChild(iframe);
+  var isLoad = url.indexOf('action=load') >= 0;
+  if (isLoad) {
+    // Use corsproxy.io to bypass Google Apps Script CORS redirect issue for loading
+    var proxyUrl = 'https://corsproxy.io/?' + encodeURIComponent(url);
+    fetch(proxyUrl)
+    .then(function(r) { return r.text(); })
+    .then(function(text) {
+      try {
+        var match = text.match(/[a-zA-Z_$][a-zA-Z0-9_$]*\s*\(([\s\S]*)\)/);
+        var json = match ? match[1] : text;
+        callback(JSON.parse(json));
+      } catch(e) {
+        console.error('Parse error:', e);
+        callback(null);
+      }
+    })
+    .catch(function(e) {
+      console.error('Fetch error:', e);
       callback(null);
-    }
-  };
-  iframe.onerror = function() {
-    if(done) return; done = true;
-    clearTimeout(timer);
-    if(iframe.parentNode) document.body.removeChild(iframe);
-    callback(null);
-  };
-  // Add callback param to URL
-  var cbName = '_cb_' + Date.now();
-  iframe.src = url + (url.indexOf('?')>=0?'&':'?') + 'callback=' + cbName;
-  document.body.appendChild(iframe);
+    });
+  } else {
+    // For chunk saving use no-cors - just need delivery
+    fetch(url, {mode: 'no-cors'})
+    .then(function(r) {
+      if(r.type === 'opaque') { callback({ok: true}); return; }
+      return r.text().then(function(text) {
+        try {
+          var match = text.match(/[a-zA-Z_$][a-zA-Z0-9_$]*\s*\(([\s\S]*)\)/);
+          var json = match ? match[1] : text;
+          callback(JSON.parse(json));
+        } catch(e) { callback({ok: true}); }
+      });
+    })
+    .catch(function(e) { callback(null); });
+  }
 }
 
 function gsPushData(retryCount) {
