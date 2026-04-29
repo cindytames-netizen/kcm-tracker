@@ -1560,7 +1560,18 @@ function applyGSData(data) {
       }
     } catch(e) { console.warn('accounts error',e); }
   }
-  if (data.newBiz) { try { var nb=JSON.parse(data.newBiz); if(Array.isArray(nb)) newBiz=nb; } catch(e){} }
+  if (data.newBiz) {
+    try {
+      var nb=JSON.parse(data.newBiz);
+      if(Array.isArray(nb) && nb.length > 0) {
+        // Merge — keep local entries that aren't in server, add server entries
+        var serverIds = {};
+        for(var i=0;i<nb.length;i++) serverIds[nb[i].id]=true;
+        var localOnly = newBiz.filter(function(n){ return !serverIds[n.id]; });
+        newBiz = nb.concat(localOnly);
+      }
+    } catch(e){}
+  }
   if (data.timeOff) { try { var to=JSON.parse(data.timeOff); if(Array.isArray(to)) timeOff=to; } catch(e){} }
   if (window._isSilentSync) return;
   updateStats(); renderRenewals(); renderCompleted(); renderActions(); renderNewBiz();
@@ -3027,7 +3038,7 @@ function saveModal(){
 function deleteEntry(){
   if(!confirm('Delete?'))return;
   var nb2=[];for(var i=0;i<newBiz.length;i++){if(newBiz[i].id!==editingId)nb2.push(newBiz[i]);}
-  newBiz=nb2;renderNewBiz();updateStats();closeModal();
+  newBiz=nb2;saveAll();renderNewBiz();updateStats();closeModal();
 }
 
 function handleFile(e){
