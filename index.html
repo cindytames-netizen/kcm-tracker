@@ -1580,16 +1580,20 @@ function applyGSData(data) {
 
 function gsPullData(silent) {
   if (!gsEnabled()) return;
+  if(window._syncInProgress) return; // prevent overlapping syncs
+  window._syncInProgress = true;
   if (!silent) {
     setSyncStatus('loading...', 'gray');
     var startTime = Date.now();
+    clearInterval(window._loadTimer);
     window._loadTimer = setInterval(function(){
       var elapsed = Math.round((Date.now()-startTime)/1000);
       setSyncStatus('loading... ' + elapsed + 's', 'gray');
     }, 1000);
   }
   gsJsonpGet(GS_URL + '?action=load', function(d) {
-    clearInterval(window._loadTimer);
+    window._syncInProgress = false;
+    if(!silent) clearInterval(window._loadTimer);
     if (!d) { setSyncStatus('offline - try Pull again', 'orange'); return; }
     if (!d.ok || !d.data) { setSyncStatus('no data yet', 'gray'); return; }
     applyGSData(d.data);
@@ -1606,13 +1610,15 @@ function syncNow() {
 function initGoogleSync() {
   if (!gsEnabled()) { setSyncStatus('not set up', 'gray'); return; }
   window._isSilentSync = false;
+  window._syncInProgress = false;
   gsPullData(false);
-  // Background auto-sync every 60 seconds — silent, no re-render
+  // Background auto-sync every 2 minutes — silent, no re-render
   setInterval(function(){
+    if(window._syncInProgress) return; // skip if already syncing
     window._isSilentSync = true;
     gsPullData(true);
-  }, 60000);
-  // Keep-alive ping every 4 minutes to keep Apps Script warm
+  }, 120000);
+  // Keep-alive ping every 4 minutes
   setInterval(function(){
     gsJsonpGet(GS_URL + '?action=ping', function(){});
   }, 240000);
