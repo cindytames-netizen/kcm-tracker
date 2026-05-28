@@ -1210,7 +1210,18 @@ function isCompleted(a) {
   }
   return true;
 }
-function isCancelled(a) { var s=(a.status||'').toLowerCase(); return s==='cancelled'||s==='bor'; }
+function isCancelled(a) { 
+  var s=(a.status||'').toLowerCase(); 
+  if(s==='cancelled'||s==='bor') return true;
+  // Check if ALL date groups are cancelled
+  return false;
+}
+
+function isDateGroupCancelled(a, exactDate) {
+  if(!exactDate || !a.dateStatuses) return false;
+  var s = (a.dateStatuses[exactDate]||'').toLowerCase();
+  return s==='cancelled'||s==='bor';
+}
 function isActive(a) { return !isCompleted(a) && !isCancelled(a); }
 function isDateGroupBound(a, exactDate) { return (getDateStatus(a,exactDate)||'').toLowerCase()==='bound'; }
 function isDateGroupCancelled(a, exactDate) { return (getDateStatus(a,exactDate)||'').toLowerCase()==='cancelled'; }
@@ -1960,6 +1971,7 @@ function renderRenewals() {
       if(!p.expDate||isNaN(p.expDate))continue;
       var ek2=p.expDate.getFullYear()+'-'+pad(p.expDate.getMonth()+1)+'-'+pad(p.expDate.getDate());
       if(isDateGroupBound(a,ek2) && allRequiredChecked(a,ek2))continue;
+      if(isDateGroupCancelled(a,ek2))continue;
       if(mf){
         var pk=p.expDate.getFullYear()+'-'+pad(p.expDate.getMonth()+1);
         if(pk!==mf)continue;
@@ -2298,10 +2310,16 @@ function setAcctStatusDirect(a, exactDate, sel) {
     return;
   }
   if(sel.value==='Cancelled'||sel.value==='BOR'){
-    a.status='Cancelled';
+    // Set status per date group, not whole account
+    if(exactDate){
+      if(!a.dateStatuses) a.dateStatuses={};
+      a.dateStatuses[exactDate]=sel.value;
+    } else {
+      a.status=sel.value;
+    }
     saveAll();updateStats();renderActions();renderRenewals();renderCancelled();
     switchTab('cancelled');
-    showToast('🚫 '+a.name+' moved to '+(a.status==='BOR'?'BOR':'Cancelled'),'sky');
+    showToast('🚫 '+a.name+' moved to '+(sel.value==='BOR'?'BOR':'Cancelled'),'sky');
     return;
   }
   setDateStatus(a,exactDate,sel.value);
@@ -2739,29 +2757,55 @@ function renderCancelled() {
   var adv=document.getElementById('cancAdvisor').value;
   var advSel=document.getElementById('cancAdvisor');
   if(advSel.options.length===1){var seen={},advs=[];for(var i=0;i<policies.length;i++){var a2=policies[i].advisor;if(!seen[a2]){seen[a2]=true;advs.push(a2);}}advs.sort();for(var i=0;i<advs.length;i++){var o=document.createElement('option');o.value=advs[i];o.textContent=advs[i];advSel.appendChild(o);}}
-  var al=Object.values(accounts);var filtered=[];
-  for(var i=0;i<al.length;i++){var a=al[i];if(!isCancelled(a))continue;if(search&&a.name.toLowerCase().indexOf(search)<0)continue;if(adv&&a.advisor!==adv)continue;filtered.push(a);}
-  var kb=document.getElementById('kanban-cancelled');
-  if(!filtered.length){kb.innerHTML='<div class="empty-state"><div class="icon">🚫</div><h3>No cancelled accounts</h3><p>Set status to <strong>Cancelled</strong></p></div>';return;}
-  var groups={};for(var i=0;i<filtered.length;i++){var k=filtered[i].advisor||'Unassigned';if(!groups[k])groups[k]=[];groups[k].push(filtered[i]);}
-  var gk=Object.keys(groups).sort();var html='';
-  for(var i=0;i<gk.length;i++){
-    var k=gk[i];var items=groups[k];var cards='';
-    for(var j=0;j<items.length;j++){
-      var a=items[j];
+  var al=Object.values(accounts);
+  var cards='';
+  var count=0;
+  for(var i=0;i<al.length;i++){
+    var a=al[i];
+    if(search&&a.name.toLowerCase().indexOf(search)<0)continue;
+    if(adv&&a.advisor!==adv)continue;
+    // Whole account cancelled
+    if(isCancelled(a)){
+      var sn=htmlEncode(a.name);
       var dates=[];for(var m=0;m<a.policies.length;m++){if(a.policies[m].expDate&&!isNaN(a.policies[m].expDate))dates.push(a.policies[m].expDate);}
       dates.sort(function(x,y){return x-y;});
       var ds=dates.length?dates[0].toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}):'—';
-      var sn=htmlEncode(a.name);
       cards+='<div class="acard" style="border-left-color:#999;opacity:0.9">'
-        +'<div class="canc-banner"><span style="font-size:12px;font-weight:700;color:#666">🚫 Cancelled</span></div>'
+        +'<div class="canc-banner"><span style="font-size:12px;font-weight:700;color:#666">🚫 '+(a.status||'Cancelled')+'</span></div>'
         +'<div class="acard-header"><div class="acard-name">'+a.name+'</div><div class="acard-meta"><span class="days-badge db-na">📅 '+ds+'</span></div></div>'
         +'<div class="acard-advisor"><div class="advisor-tag" style="padding:0 18px 12px">👤 <span>'+a.advisor+'</span></div><div style="padding:0 18px 12px"><button class="followup-btn" style="background:#fdeaea;color:var(--red)" onclick="undoCancelled(\''+sn+'\')">↩ Move Back</button></div></div>'
         +'</div>';
+      count++;
+      continue;
     }
-    html+='<div class="col"><div class="col-header"><h3>'+k+'</h3><span class="col-count">'+items.length+'</span></div><div class="col-body">'+cards+'</div></div>';
+    // Per-date-group cancelled
+    if(!a.dateStatuses) continue;
+    var dkeys=Object.keys(a.dateStatuses);
+    for(var d=0;d<dkeys.length;d++){
+      var dk=dkeys[d];
+      var ds2=(a.dateStatuses[dk]||'').toLowerCase();
+      if(ds2!=='cancelled'&&ds2!=='bor') continue;
+      var sn=htmlEncode(a.name);
+      var dispDate=parseLocalDate(dk);
+      var dateStr=dispDate?dispDate.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}):dk;
+      cards+='<div class="acard" style="border-left-color:#999;opacity:0.9">'
+        +'<div class="canc-banner"><span style="font-size:12px;font-weight:700;color:#666">🚫 '+(a.dateStatuses[dk])+'</span></div>'
+        +'<div class="acard-header"><div class="acard-name">'+a.name+'</div><div class="acard-meta"><span class="days-badge db-na">📅 '+dateStr+'</span></div></div>'
+        +'<div class="acard-advisor"><div class="advisor-tag" style="padding:0 18px 12px">👤 <span>'+a.advisor+'</span></div><div style="padding:0 18px 12px"><button class="followup-btn" style="background:#fdeaea;color:var(--red)" onclick="undoCancelledDate(\''+sn+'\',\''+dk+'\')">↩ Move Back</button></div></div>'
+        +'</div>';
+      count++;
+    }
   }
-  kb.innerHTML=html;
+  var kb=document.getElementById('kanban-cancelled');
+  if(!count){kb.innerHTML='<div class="empty-state"><div class="icon">🚫</div><h3>No cancelled accounts</h3><p>Set status to <strong>Cancelled</strong></p></div>';return;}
+  kb.innerHTML='<div class="col"><div class="col-header"><h3>Cancelled</h3><span class="col-count">'+count+'</span></div><div class="col-body">'+cards+'</div></div>';
+}
+
+function undoCancelledDate(name, exactDate){
+  var a=accounts[decodeHtml(name)];
+  if(!a||!a.dateStatuses||!exactDate)return;
+  delete a.dateStatuses[exactDate];
+  saveAll();updateStats();renderCancelled();renderRenewals();
 }
 
 function parseLocalDate(str) {
