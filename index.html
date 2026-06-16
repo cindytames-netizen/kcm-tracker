@@ -1767,10 +1767,13 @@ function acctMinDays(a) {
     var p=a.policies[i];
     var n=p.daysUntil;
     if(n===null)continue;
-    // Skip policies whose date group is already bound
     if(p.expDate&&!isNaN(p.expDate)){
       var ek=p.expDate.getFullYear()+'-'+pad(p.expDate.getMonth()+1)+'-'+pad(p.expDate.getDate());
-      if(isDateGroupBound(a,ek))continue;
+      if(isDateGroupBound(a,ek)){
+        // Bound accounts get 30 day grace — treat overdue as 0
+        if(n<0) n=Math.max(n+30, 0);
+        else continue; // skip non-overdue bound groups
+      }
     }
     if(min===null||n<min)min=n;
   }
@@ -1983,6 +1986,8 @@ function renderRenewals() {
       // Apply urgency filter per date group
       if(urg){
         var days=p.daysUntil;
+        // Bound date groups get 30 day grace
+        if(days!==null && isDateGroupBound(a,ek2) && days<0) days=Math.max(days+30,0);
         var cardUrg='';
         if(days===null)cardUrg='';
         else if(days<0)cardUrg='past';
@@ -2085,7 +2090,16 @@ function makeCard(a,visiblePols,groupKey) {
   var ns=[];for(var i=0;i<pols.length;i++){var n=pols[i].daysUntil;if(n!==null)ns.push(n);}
   var minD=ns.length?Math.min.apply(null,ns):null;
   var urgC='',dbC='db-na',dbT='N/A';
-  if(minD!==null){if(minD<0){urgC='urg-past';dbC='db-past';dbT=Math.abs(minD)+'d overdue';}else if(minD<=30){urgC='urg-red';dbC='db-red';dbT=minD+'d';}else if(minD<=120){urgC='urg-yellow';dbC='db-yellow';dbT=minD+'d';}else{urgC='urg-green';dbC='db-green';dbT=minD+'d';}}
+  if(minD!==null){
+    // Bound date groups get 30 day grace period
+    var isBound=isDateGroupBound(a, exactDate);
+    var adjustedD = (isBound && minD<0) ? Math.max(minD+30, 0) : minD;
+    if(adjustedD<0){urgC='urg-past';dbC='db-past';dbT=Math.abs(adjustedD)+'d overdue';}
+    else if(adjustedD<=30){urgC='urg-red';dbC='db-red';dbT=adjustedD+'d';}
+    else if(adjustedD<=120){urgC='urg-yellow';dbC='db-yellow';dbT=adjustedD+'d';}
+    else{urgC='urg-green';dbC='db-green';dbT=adjustedD+'d';}
+    if(isBound && minD<0 && adjustedD>=0) dbT='Bound ('+Math.abs(minD)+'d past)';
+  }
   var fmtD=function(d){return d.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});};
   var dates=[];for(var i=0;i<pols.length;i++){if(pols[i].expDate&&!isNaN(pols[i].expDate))dates.push(pols[i].expDate);}
   dates.sort(function(x,y){return x-y;});
