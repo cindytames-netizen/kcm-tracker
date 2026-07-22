@@ -1511,23 +1511,18 @@ function gsPushData(retryCount) {
         return;
       }
       setSyncStatus('saving part '+(idx+1)+'/'+total+'...', 'orange');
-      // Send chunk via no-cors POST with text/plain (bypasses CORS preflight)
-      fetch(GS_URL, {
-        method: 'POST',
-        mode: 'no-cors',
-        headers: {'Content-Type': 'text/plain;charset=utf-8'},
-        body: JSON.stringify({action: 'chunk', session: sessionId, idx: idx, total: total, data: chunks[idx]})
-      })
-      .then(function() {
-        // no-cors is opaque - assume success and continue
-        setTimeout(function(){ sendChunk(idx + 1); }, 500);
-      })
-      .catch(function() {
-        if (attempt < 3) {
-          setTimeout(function(){ sendChunk(idx, attempt+1); }, 2000);
-        } else {
-          setSyncStatus('save error (part '+(idx+1)+')', 'red');
+      // Use JSONP GET for chunks - works with GAS since we fixed MIME type
+      var url = GS_URL + '?action=chunk&session=' + sessionId + '&idx=' + idx + '&total=' + total + '&data=' + encodeURIComponent(chunks[idx]);
+      gsScriptTag(url, function(d) {
+        if (!d || !d.ok) {
+          if (attempt < 3) {
+            setTimeout(function(){ sendChunk(idx, attempt+1); }, 2000);
+          } else {
+            setSyncStatus('save error (part '+(idx+1)+')', 'red');
+          }
+          return;
         }
+        setTimeout(function(){ sendChunk(idx + 1); }, 300);
       });
     }
     sendChunk(0);
