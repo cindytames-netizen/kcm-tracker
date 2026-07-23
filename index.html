@@ -1431,7 +1431,7 @@ function gsScriptTag(url, callback) {
     delete window[cbName];
     if(script.parentNode) document.body.removeChild(script);
     callback(null);
-  }, 60000);
+  }, 15000);
   window[cbName] = function(d) {
     if(done) return; done = true;
     clearTimeout(timer);
@@ -1486,8 +1486,8 @@ function gsPushData(retryCount) {
     }
     // Split into chunks of 5000 chars
     var chunks = [];
-    for (var i = 0; i < encoded.length; i += 2000) {
-      chunks.push(encoded.substring(i, i + 2000));
+    for (var i = 0; i < encoded.length; i += 500) {
+      chunks.push(encoded.substring(i, i + 500));
     }
     var total = chunks.length;
     var sessionId = Date.now().toString(36); // unique session ID
@@ -1511,15 +1511,12 @@ function gsPushData(retryCount) {
         }, 800);
         return;
       }
-      alert('sendChunk called: idx='+idx+' attempt='+attempt+' total='+total);
       setSyncStatus('saving part '+(idx+1)+'/'+total+'...', 'orange');
       // Use JSONP GET for chunks - works with GAS since we fixed MIME type
       var url = GS_URL + '?action=chunk&session=' + sessionId + '&idx=' + idx + '&total=' + total + '&data=' + encodeURIComponent(chunks[idx]);
       if(idx===1) alert('Chunk 1 URL len:'+url.length+' data len:'+chunks[idx].length+' url start:'+url.substring(0,200));
       (function(currentIdx, currentAttempt){
         gsScriptTag(url, function(d) {
-          if(!d && currentIdx===1) alert('Chunk 1 callback: null - script tag failed');
-          else if(d && currentIdx===1) alert('Chunk 1 response: '+JSON.stringify(d));
           if (!d || !d.ok) {
             if (currentAttempt < 3) {
               setTimeout(function(){ sendChunk(currentIdx, currentAttempt+1); }, 2000);
