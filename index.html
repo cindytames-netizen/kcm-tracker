@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline' 'unsafe-eval'; script-src 'self' 'unsafe-inline' https://script.googleusercontent.com https://script.google.com; connect-src *; img-src * data:; style-src 'self' 'unsafe-inline';">
+<meta http-equiv="Content-Security-Policy" content="default-src * 'unsafe-inline' 'unsafe-eval' data: blob:;">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>KCM Renewal Tracker</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
@@ -1514,7 +1514,6 @@ function gsPushData(retryCount) {
       setSyncStatus('saving part '+(idx+1)+'/'+total+'...', 'orange');
       // Use JSONP GET for chunks - works with GAS since we fixed MIME type
       var url = GS_URL + '?action=chunk&session=' + sessionId + '&idx=' + idx + '&total=' + total + '&data=' + encodeURIComponent(chunks[idx]);
-      if(idx===1) alert('Chunk 1 URL len:'+url.length+' data len:'+chunks[idx].length+' url start:'+url.substring(0,200));
       (function(currentIdx, currentAttempt){
         gsScriptTag(url, function(d) {
           if (!d || !d.ok) {
