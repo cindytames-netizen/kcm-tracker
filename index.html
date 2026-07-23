@@ -1513,17 +1513,19 @@ function gsPushData(retryCount) {
       setSyncStatus('saving part '+(idx+1)+'/'+total+'...', 'orange');
       // Use JSONP GET for chunks - works with GAS since we fixed MIME type
       var url = GS_URL + '?action=chunk&session=' + sessionId + '&idx=' + idx + '&total=' + total + '&data=' + encodeURIComponent(chunks[idx]);
-      gsScriptTag(url, function(d) {
-        if (!d || !d.ok) {
-          if (attempt < 3) {
-            setTimeout(function(){ sendChunk(idx, attempt+1); }, 2000);
-          } else {
-            setSyncStatus('save error (part '+(idx+1)+')', 'red');
+      (function(currentIdx, currentAttempt){
+        gsScriptTag(url, function(d) {
+          if (!d || !d.ok) {
+            if (currentAttempt < 3) {
+              setTimeout(function(){ sendChunk(currentIdx, currentAttempt+1); }, 2000);
+            } else {
+              setSyncStatus('save error (part '+(currentIdx+1)+')', 'red');
+            }
+            return;
           }
-          return;
-        }
-        setTimeout(function(){ sendChunk(idx + 1); }, 300);
-      });
+          setTimeout(function(){ sendChunk(currentIdx + 1); }, 500);
+        });
+      })(idx, attempt);
     }
     sendChunk(0);
   }, 2000);
