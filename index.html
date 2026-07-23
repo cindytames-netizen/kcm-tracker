@@ -1486,8 +1486,8 @@ function gsPushData(retryCount) {
     }
     // Split into chunks of 5000 chars
     var chunks = [];
-    for (var i = 0; i < encoded.length; i += 500) {
-      chunks.push(encoded.substring(i, i + 500));
+    for (var i = 0; i < encoded.length; i += 3000) {
+      chunks.push(encoded.substring(i, i + 3000));
     }
     var total = chunks.length;
     var sessionId = Date.now().toString(36); // unique session ID
