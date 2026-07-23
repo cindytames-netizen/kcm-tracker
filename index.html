@@ -1511,6 +1511,7 @@ function gsPushData(retryCount) {
         }, 800);
         return;
       }
+      alert('sendChunk called: idx='+idx+' attempt='+attempt+' total='+total);
       setSyncStatus('saving part '+(idx+1)+'/'+total+'...', 'orange');
       // Use JSONP GET for chunks - works with GAS since we fixed MIME type
       var url = GS_URL + '?action=chunk&session=' + sessionId + '&idx=' + idx + '&total=' + total + '&data=' + encodeURIComponent(chunks[idx]);
