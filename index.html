@@ -1420,9 +1420,10 @@ function gsBuildPayload() {
   };
 }
 
+var _gsCallbackCounter = 0;
 function gsScriptTag(url, callback) {
   // Script tags follow GAS redirects to googleusercontent.com which allows JSONP
-  var cbName = '_gsCb_' + Date.now() + '_' + Math.floor(Math.random()*99999);
+  var cbName = '_gsCb_' + (++_gsCallbackCounter) + '_' + Date.now();
   var script = document.createElement('script');
   var done = false;
   var timer = setTimeout(function(){
@@ -1523,7 +1524,7 @@ function gsPushData(retryCount) {
             }
             return;
           }
-          setTimeout(function(){ sendChunk(currentIdx + 1); }, 500);
+          setTimeout(function(){ sendChunk(currentIdx + 1); }, 1000);
         });
       })(idx, attempt);
     }
