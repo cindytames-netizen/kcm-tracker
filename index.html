@@ -80,6 +80,11 @@ header{background:linear-gradient(135deg,var(--sky-dark),var(--green));padding:0
 .pl-desc{font-size:12px;font-weight:600;flex:1;}
 .pl-carrier{font-size:10px;color:var(--muted);background:#EEF5FA;border-radius:6px;padding:2px 7px;}
 .pl-date{font-size:10px;color:var(--muted);}
+.pl-premium{display:flex;align-items:center;gap:5px;margin-top:5px;}
+.pl-premium label{font-size:10px;color:var(--muted);font-weight:600;}
+.pl-premium input{border:1.5px solid var(--border);border-radius:6px;padding:3px 7px;font-size:11px;font-weight:600;color:var(--text);width:110px;outline:none;background:white;}
+.pl-premium input:focus{border-color:var(--sky);}
+.pl-prem-total{font-size:11px;font-weight:700;color:var(--green-dark);background:var(--green-light);border-radius:20px;padding:3px 10px;}
 .pl-checks{display:flex;flex-wrap:wrap;gap:4px;margin-top:5px;}
 .chk{display:inline-flex;align-items:center;gap:3px;font-size:10px;font-weight:600;padding:3px 8px;border-radius:6px;cursor:pointer;user-select:none;border:1px solid transparent;}
 .chk.done{background:var(--green-light);color:var(--green-dark);border-color:var(--green);}
@@ -319,6 +324,20 @@ header{background:linear-gradient(135deg,var(--sky-dark),var(--green));padding:0
     <button class="mbtn mbtn-delete hidden" id="mDelete" onclick="deleteEntry()">🗑 Delete</button>
     <button class="mbtn mbtn-cancel" onclick="closeModal()">Cancel</button>
     <button class="mbtn mbtn-save" onclick="saveModal()">Save</button>
+  </div>
+</div>
+</div>
+
+<div class="modal-overlay hidden" id="boundOverlay" onclick="if(event.target===this)closeBoundModal()">
+<div class="modal">
+  <div class="modal-header"><h2>✅ Mark as Bound</h2><p id="boundAcctName" style="font-size:13px;font-weight:700;color:var(--text);margin-top:4px;"></p></div>
+  <div class="modal-body">
+    <div class="field-group"><label>Bound Carrier</label><input id="boundCarrier" placeholder="e.g. Travelers, Nationwide…"></div>
+    <div class="field-group"><label>Bound Premium</label><input id="boundPremium" placeholder="e.g. $12,500" type="text"></div>
+  </div>
+  <div class="modal-footer">
+    <button class="mbtn mbtn-cancel" onclick="closeBoundModal()">Cancel</button>
+    <button class="mbtn mbtn-save" onclick="confirmBound()">✅ Confirm Bound</button>
   </div>
 </div>
 </div>
@@ -717,7 +736,7 @@ function buildData() {
     var exp = new Date(r[0]);
     exp.setHours(0,0,0,0);
     var days = isNaN(exp) ? null : Math.round((exp - today) / 86400000);
-    var pol = {id:i, accountName:r[1], issuingCompany:r[2], advisor:r[3], description:r[4], expDate:exp, daysUntil:days, docuSign:'', submitted:'', epicBilled:'', certsLender:'', binder:'', policySent:'', quoteGL:'', quoteProp:'', quoteUmb:'', quoteWC:'', quoteFlood:'', quoteBond:''};
+    var pol = {id:i, accountName:r[1], issuingCompany:r[2], advisor:r[3], description:r[4], expDate:exp, daysUntil:days, premium:'', docuSign:'', submitted:'', epicBilled:'', certsLender:'', binder:'', policySent:'', quoteGL:'', quoteProp:'', quoteUmb:'', quoteWC:'', quoteFlood:'', quoteBond:''};
     policies.push(pol);
     if (!accounts[r[1]]) accounts[r[1]] = {name:r[1], advisor:r[3], status:'', followupLog:[], policies:[]};
     accounts[r[1]].policies.push(pol);
@@ -727,7 +746,7 @@ function buildData() {
 function isTruthy(v) {
   if (!v) return false;
   var s = v.toString().toLowerCase().trim();
-  return s==='yes'||s==='y'||s==='1'||s==='x'||s==='true'||s==='sent'||s==='done'||s==='complete'||s==='submitted'||s==='bound'||s==='received';
+  return s==='yes'||s==='y'||s==='1'||s==='x'||s==='true'||s==='sent'||s==='done'||s==='complete'||s==='submitted'||s==='received';
 }
 
 function isCompleted(a) { return (a.status||'').toLowerCase()==='bound'; }
@@ -796,7 +815,7 @@ function loadSaved() {
     if(rs) {
       var ed=JSON.parse(rs);
       if(ed.policies) { for(var i=0;i<policies.length;i++){var s=ed.policies[policies[i].id];if(s)Object.assign(policies[i],s);} }
-      if(ed.accounts) { var ns=Object.keys(ed.accounts); for(var i=0;i<ns.length;i++){var n=ns[i];if(accounts[n])Object.assign(accounts[n],{status:ed.accounts[n].status||'',followupLog:ed.accounts[n].followupLog||[]});} }
+      if(ed.accounts) { var ns=Object.keys(ed.accounts); for(var i=0;i<ns.length;i++){var n=ns[i];if(accounts[n])Object.assign(accounts[n],{status:ed.accounts[n].status||'',boundCarrier:ed.accounts[n].boundCarrier||'',boundPremium:ed.accounts[n].boundPremium||'',followupLog:ed.accounts[n].followupLog||[]});} }
     }
     var nb=localStorage.getItem(SK_NB); if(nb)newBiz=JSON.parse(nb);
     var rl=localStorage.getItem(SK_RULES);
@@ -811,8 +830,8 @@ function loadSaved() {
 function saveAll() {
   try {
     var pd={};
-    for(var i=0;i<policies.length;i++){var p=policies[i];pd[p.id]={docuSign:p.docuSign,submitted:p.submitted,epicBilled:p.epicBilled,certsLender:p.certsLender,binder:p.binder,policySent:p.policySent,quoteGL:p.quoteGL,quoteProp:p.quoteProp,quoteUmb:p.quoteUmb,quoteWC:p.quoteWC,quoteFlood:p.quoteFlood,quoteBond:p.quoteBond};}
-    var ad={};var ns=Object.keys(accounts);for(var i=0;i<ns.length;i++){var n=ns[i];    ad[n]={status:accounts[n].status,followupLog:accounts[n].followupLog||[],notesLog:accounts[n].notesLog||[]};}
+    for(var i=0;i<policies.length;i++){var p=policies[i];pd[p.id]={premium:p.premium||'',docuSign:p.docuSign,submitted:p.submitted,epicBilled:p.epicBilled,certsLender:p.certsLender,binder:p.binder,policySent:p.policySent,quoteGL:p.quoteGL,quoteProp:p.quoteProp,quoteUmb:p.quoteUmb,quoteWC:p.quoteWC,quoteFlood:p.quoteFlood,quoteBond:p.quoteBond};}
+    var ad={};var ns=Object.keys(accounts);for(var i=0;i<ns.length;i++){var n=ns[i];ad[n]={status:accounts[n].status,boundCarrier:accounts[n].boundCarrier||'',boundPremium:accounts[n].boundPremium||'',followupLog:accounts[n].followupLog||[],notesLog:accounts[n].notesLog||[]};}
     localStorage.setItem(SK,JSON.stringify({policies:pd,accounts:ad}));
     localStorage.setItem(SK_NB,JSON.stringify(newBiz));
     localStorage.setItem(SK_RULES,JSON.stringify(rules));
@@ -994,6 +1013,7 @@ function makeCard(a,visiblePols) {
   }
   var alertPill=alerts.length?'<span class="alert-pill">⚠️ '+alerts.length+'</span>':'';
   var polLines='';
+  var totalPrem=0;
   for(var i=0;i<pols.length;i++){
     var p=pols[i];
     var isCancA=isCancelled(a);
@@ -1002,8 +1022,13 @@ function makeCard(a,visiblePols) {
     var qchk='';
     if(!isCancA){for(var j=0;j<QUOTES.length;j++){var q=QUOTES[j];if(isRelevantQuote(p.description,q.k))qchk+='<span class="qchk '+(isTruthy(p[q.k])?'done':'undone')+'" onclick="togglePol('+p.id+',\''+q.k+'\',this,event)">'+(isTruthy(p[q.k])?'✔ ':'')+q.l+'</span>';}}
     var pd=p.expDate&&!isNaN(p.expDate)?fmtD(p.expDate):'';
-    polLines+='<div class="policy-line"><div class="pl-top"><span class="pl-desc">'+p.description+'</span><span class="pl-carrier">'+p.issuingCompany+'</span><span class="pl-date">'+pd+'</span></div>'+(chk?'<div class="pl-checks">'+chk+'</div>':'')+(qchk?'<div class="pl-quotes">'+qchk+'</div>':'')+'</div>';
+    var premVal=p.premium||'';
+    var premNum=parseFloat(premVal.toString().replace(/[$,]/g,''));
+    if(!isNaN(premNum)&&premNum>0)totalPrem+=premNum;
+    var premInp='<div class="pl-premium"><label>💲 Premium</label><input type="text" placeholder="$0" value="'+premVal.replace(/"/g,'&quot;')+'" onchange="setPremium('+p.id+',this.value)" onclick="event.stopPropagation()" onkeydown="event.stopPropagation()"></div>';
+    polLines+='<div class="policy-line"><div class="pl-top"><span class="pl-desc">'+p.description+'</span><span class="pl-carrier">'+p.issuingCompany+'</span><span class="pl-date">'+pd+'</span></div>'+premInp+(chk?'<div class="pl-checks">'+chk+'</div>':'')+(qchk?'<div class="pl-quotes">'+qchk+'</div>':'')+'</div>';
   }
+  var premTotalBadge=totalPrem>0?'<span class="pl-prem-total">💲'+totalPrem.toLocaleString('en-US',{minimumFractionDigits:0,maximumFractionDigits:0})+'</span>':'';
   if(!a.followupLog)a.followupLog=[];
   if(!a.notesLog)a.notesLog=[];
   var fl=a.followupLog;
@@ -1017,7 +1042,7 @@ function makeCard(a,visiblePols) {
   return '<div class="acard '+urgC+(alerts.length?' has-alerts':'')+'" id="acard-'+sk+'">'
     +'<div class="acard-header">'
       +'<div class="acard-name">'+a.name+'</div>'
-      +'<div class="acard-meta"><span class="days-badge '+dbC+'">📅 '+dbT+'</span><span class="policy-count" onclick="togglePolicies(\''+sk+'\',this,event)">'+cntLabel+'</span>'+alertPill+'</div>'
+      +'<div class="acard-meta"><span class="days-badge '+dbC+'">📅 '+dbT+'</span><span class="policy-count" onclick="togglePolicies(\''+sk+'\',this,event)">'+cntLabel+'</span>'+premTotalBadge+alertPill+'</div>'
       +'<div style="font-size:11px;color:var(--muted);">📆 '+dateStr+'</div>'
     +'</div>'
     +alertBanner
@@ -1074,14 +1099,64 @@ function togglePol(id,field,el,e) {
   updateStats();renderActions();
 }
 
+function setPremium(id,val) {
+  var p=null;for(var i=0;i<policies.length;i++){if(policies[i].id===id){p=policies[i];break;}}
+  if(!p)return;
+  p.premium=val.trim();
+  // update total badge on card without full re-render
+  var acct=accounts[p.accountName];if(!acct)return;
+  var sk=p.accountName.replace(/\W/g,'_');
+  var card=document.getElementById('acard-'+sk);
+  if(card){
+    var total=0;
+    for(var i=0;i<acct.policies.length;i++){var v=parseFloat((acct.policies[i].premium||'').toString().replace(/[$,]/g,''));if(!isNaN(v)&&v>0)total+=v;}
+    var badge=card.querySelector('.pl-prem-total');
+    if(total>0){
+      var fmt='💲'+total.toLocaleString('en-US',{minimumFractionDigits:0,maximumFractionDigits:0});
+      if(badge){badge.textContent=fmt;}
+      else{var meta=card.querySelector('.acard-meta');if(meta){var sp=document.createElement('span');sp.className='pl-prem-total';sp.textContent=fmt;var pill=meta.querySelector('.alert-pill');if(pill)meta.insertBefore(sp,pill);else meta.appendChild(sp);}}
+    } else {if(badge)badge.remove();}
+  }
+  updateStats();
+}
+
+var _boundPending={name:null,sel:null};
 function setAcctStatus(name,sel,e) {
   if(e)e.stopPropagation();
   var a=accounts[name];if(!a)return;
   if(sel.value==='Rewrite'){openRewrite(name,sel);return;}
+  var prev=a.status||'';
+  if(sel.value==='Bound'){
+    _boundPending={name:name,sel:sel,prev:prev};
+    document.getElementById('boundAcctName').textContent=name;
+    document.getElementById('boundCarrier').value=a.boundCarrier||'';
+    document.getElementById('boundPremium').value=a.boundPremium||'';
+    document.getElementById('boundOverlay').classList.remove('hidden');
+    setTimeout(function(){document.getElementById('boundCarrier').focus();},100);
+    return;
+  }
+  if(sel.value==='Cancelled'){
+    if(!confirm('Mark "'+name+'" as CANCELLED?\nThis will remove it from the Renewals board.')){sel.value=prev;return;}
+  }
   a.status=sel.value;
   updateStats();renderActions();renderRenewals();
   if(isCompleted(a))renderCompleted();
   if(isCancelled(a))renderCancelled();
+}
+function closeBoundModal(){
+  document.getElementById('boundOverlay').classList.add('hidden');
+  if(_boundPending.sel)_boundPending.sel.value=_boundPending.prev||'';
+  _boundPending={name:null,sel:null,prev:null};
+}
+function confirmBound(){
+  var name=_boundPending.name;if(!name)return;
+  var a=accounts[name];if(!a)return;
+  a.boundCarrier=document.getElementById('boundCarrier').value.trim();
+  a.boundPremium=document.getElementById('boundPremium').value.trim();
+  a.status='Bound';
+  document.getElementById('boundOverlay').classList.add('hidden');
+  _boundPending={name:null,sel:null,prev:null};
+  updateStats();renderActions();renderRenewals();renderCompleted();
 }
 
 function addFL(name,e) {
@@ -1154,9 +1229,13 @@ function renderCompleted() {
       dates.sort(function(x,y){return x-y;});
       var ds=dates.length?dates[0].toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}):'—';
       var sk=a.name.replace(/\W/g,'_');var sn=a.name.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+      var bcarrier=a.boundCarrier?'🏢 '+a.boundCarrier:'';
+      var bprem=a.boundPremium?'💲 '+a.boundPremium:'';
+      var boundInfo=(bcarrier||bprem)?'<div style="font-size:11px;color:var(--green-dark);padding:2px 18px 10px;font-weight:600;">'+(bcarrier?bcarrier:'')+(bcarrier&&bprem?' · ':'')+bprem+'</div>':'';
       cards+='<div class="acard urg-green" style="border-left-color:var(--green)">'
         +'<div class="comp-banner"><span style="font-size:12px;font-weight:700;color:var(--green-dark)">✅ Bound & Complete</span></div>'
-        +'<div class="acard-header"><div class="acard-name">'+a.name+'</div><div class="acard-meta"><span class="days-badge db-green">📅 '+ds+'</span><span class="policy-count">📋 '+a.policies.length+' polic'+(a.policies.length===1?'y':'ies')+'</span></div></div>'
+        +'<div class="acard-header"><div class="acard-name">'+a.name+'</div><div class="acard-meta"><span class="days-badge db-green">📅 '+ds+'</span><span class="policy-count">📋 '+a.policies.length+' polic'+(a.policies.length===1?'y':'ies')+'</span>'+(bprem?'<span class="pl-prem-total">'+bprem+'</span>':'')+'</div></div>'
+        +boundInfo
         +'<div class="acard-advisor"><div class="advisor-tag" style="padding:0 18px 12px">👤 <span>'+a.advisor+'</span></div><div style="padding:0 18px 12px"><button class="followup-btn" style="background:#fdeaea;color:var(--red)" onclick="undoComplete(\''+sn+'\')">↩ Move Back</button></div></div>'
         +'</div>';
     }
@@ -1335,7 +1414,7 @@ function handleFile(e){
       var key=hkeys[ki];cols[key]=-1;
       for(var ci=0;ci<hm[key].length;ci++){for(var hi=0;hi<headers.length;hi++){if(headers[hi].toLowerCase().trim().replace(/\s+/g,' ')===hm[key][ci]){cols[key]=hi;break;}}if(cols[key]>=0)break;}
     }
-    var savedE={};for(var i=0;i<policies.length;i++){var p=policies[i];savedE[p.accountName+'||'+p.description]={docuSign:p.docuSign,submitted:p.submitted,epicBilled:p.epicBilled,certsLender:p.certsLender,binder:p.binder,policySent:p.policySent,quoteGL:p.quoteGL,quoteProp:p.quoteProp,quoteUmb:p.quoteUmb,quoteWC:p.quoteWC,quoteFlood:p.quoteFlood,quoteBond:p.quoteBond};}
+    var savedE={};for(var i=0;i<policies.length;i++){var p=policies[i];savedE[p.accountName+'||'+p.description]={premium:p.premium||'',docuSign:p.docuSign,submitted:p.submitted,epicBilled:p.epicBilled,certsLender:p.certsLender,binder:p.binder,policySent:p.policySent,quoteGL:p.quoteGL,quoteProp:p.quoteProp,quoteUmb:p.quoteUmb,quoteWC:p.quoteWC,quoteFlood:p.quoteFlood,quoteBond:p.quoteBond};}
     var savedA={};var ans=Object.keys(accounts);for(var i=0;i<ans.length;i++)savedA[ans[i]]={status:accounts[ans[i]].status,followupLog:accounts[ans[i]].followupLog||[]};
     var newRAW=[];
     for(var i=hr+1;i<raw.length;i++){
