@@ -188,9 +188,8 @@ header{background:linear-gradient(135deg,var(--sky-dark),var(--green));padding:0
     </select>
     <select id="rAlerts" onchange="renderRenewals()"><option value="">All</option><option value="alerts">🚨 Alerts Only</option></select>
     <div class="seg">
-      <button class="seg-btn active" id="grp-date" onclick="setGroup('date')">Month</button>
+      <button class="seg-btn active" id="grp-weekly" onclick="setGroup('weekly')">Weekly</button>
       <button class="seg-btn" id="grp-biweekly" onclick="setGroup('biweekly')">Biweekly</button>
-      <button class="seg-btn" id="grp-weekly" onclick="setGroup('weekly')">Weekly</button>
       <button class="seg-btn" id="grp-day" onclick="setGroup('day')">Daily</button>
     </div>
     <button class="cbtn cbtn-sky" onclick="setCurrentMonth()">📅 This Month</button>
@@ -334,7 +333,7 @@ var DEFAULT_RULES=[
   {id:'r3',name:'Bound but Policy Not Sent',desc:'Policy bound but not sent to insured',field:'policySent',op:'notChecked',val:'',daysCond:'any',daysVal:0,msg:'Follow up — send policy to insured',severity:'warn',on:true,builtIn:true}
 ];
 var today=new Date(); today.setHours(0,0,0,0);
-var policies=[], accounts={}, newBiz=[], rules=[], groupBy='date';
+var policies=[], accounts={}, newBiz=[], rules=[], groupBy='weekly';
 var editingId=null, rewriteAcct=null, rewriteSel=null;
 
 var RAW=[
@@ -875,7 +874,7 @@ function switchTab(t) {
 
 function setGroup(g) {
   groupBy=g;
-  var gs=['date','biweekly','weekly','day'];
+  var gs=['weekly','biweekly','day'];
   for(var i=0;i<gs.length;i++)document.getElementById('grp-'+gs[i]).classList.toggle('active',gs[i]===g);
   renderRenewals();
 }
