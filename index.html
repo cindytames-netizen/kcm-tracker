@@ -76,13 +76,14 @@ header{background:linear-gradient(135deg,var(--sky-dark),var(--green));padding:0
 .policy-lines.open{display:block;}
 .policy-line{padding:10px 18px;border-bottom:1px solid #F0F6FA;background:#FAFCFF;}
 .policy-line:last-child{border-bottom:none;}
-.pl-top{display:flex;align-items:center;gap:8px;margin-bottom:6px;}
-.pl-desc{font-size:12px;font-weight:600;flex:1;}
-.pl-carrier{font-size:10px;color:var(--muted);background:#EEF5FA;border-radius:6px;padding:2px 7px;}
-.pl-date{font-size:10px;color:var(--muted);}
+.pl-top{display:flex;flex-direction:column;gap:4px;margin-bottom:6px;}
+.pl-desc{font-size:12px;font-weight:700;color:var(--text);}
+.pl-meta{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+.pl-carrier{font-size:10px;color:var(--muted);background:#EEF5FA;border-radius:6px;padding:2px 7px;font-weight:600;}
+.pl-date{font-size:10px;color:var(--muted);font-weight:600;}
 .pl-premium{display:flex;align-items:center;gap:5px;margin-top:5px;}
 .pl-premium label{font-size:10px;color:var(--muted);font-weight:600;}
-.pl-premium input{border:1.5px solid var(--border);border-radius:6px;padding:3px 7px;font-size:11px;font-weight:600;color:var(--text);width:110px;outline:none;background:white;}
+.pl-premium input{border:1.5px solid var(--border);border-radius:6px;padding:3px 7px;font-size:11px;font-weight:600;color:var(--text);width:120px;outline:none;background:white;}
 .pl-premium input:focus{border-color:var(--sky);}
 .pl-prem-total{font-size:11px;font-weight:700;color:var(--green-dark);background:var(--green-light);border-radius:20px;padding:3px 10px;}
 .pl-checks{display:flex;flex-wrap:wrap;gap:4px;margin-top:5px;}
@@ -752,6 +753,7 @@ function isTruthy(v) {
 function isCompleted(a) { return (a.status||'').toLowerCase()==='bound'; }
 function isCancelled(a) { return (a.status||'').toLowerCase()==='cancelled'; }
 function isActive(a) { return !isCompleted(a) && !isCancelled(a); }
+function isDateBound(a,dateKey) { return a.boundDates&&a.boundDates.indexOf(dateKey)>=0; }
 
 function acctMinDays(a) {
   var min=null;
@@ -815,7 +817,7 @@ function loadSaved() {
     if(rs) {
       var ed=JSON.parse(rs);
       if(ed.policies) { for(var i=0;i<policies.length;i++){var s=ed.policies[policies[i].id];if(s)Object.assign(policies[i],s);} }
-      if(ed.accounts) { var ns=Object.keys(ed.accounts); for(var i=0;i<ns.length;i++){var n=ns[i];if(accounts[n])Object.assign(accounts[n],{status:ed.accounts[n].status||'',boundCarrier:ed.accounts[n].boundCarrier||'',boundPremium:ed.accounts[n].boundPremium||'',followupLog:ed.accounts[n].followupLog||[]});} }
+      if(ed.accounts) { var ns=Object.keys(ed.accounts); for(var i=0;i<ns.length;i++){var n=ns[i];if(accounts[n])Object.assign(accounts[n],{status:ed.accounts[n].status||'',boundCarrier:ed.accounts[n].boundCarrier||'',boundPremium:ed.accounts[n].boundPremium||'',boundDates:ed.accounts[n].boundDates||[],followupLog:ed.accounts[n].followupLog||[]});} }
     }
     var nb=localStorage.getItem(SK_NB); if(nb)newBiz=JSON.parse(nb);
     var rl=localStorage.getItem(SK_RULES);
@@ -831,7 +833,7 @@ function saveAll() {
   try {
     var pd={};
     for(var i=0;i<policies.length;i++){var p=policies[i];pd[p.id]={premium:p.premium||'',docuSign:p.docuSign,submitted:p.submitted,epicBilled:p.epicBilled,certsLender:p.certsLender,binder:p.binder,policySent:p.policySent,quoteGL:p.quoteGL,quoteProp:p.quoteProp,quoteUmb:p.quoteUmb,quoteWC:p.quoteWC,quoteFlood:p.quoteFlood,quoteBond:p.quoteBond};}
-    var ad={};var ns=Object.keys(accounts);for(var i=0;i<ns.length;i++){var n=ns[i];ad[n]={status:accounts[n].status,boundCarrier:accounts[n].boundCarrier||'',boundPremium:accounts[n].boundPremium||'',followupLog:accounts[n].followupLog||[],notesLog:accounts[n].notesLog||[]};}
+    var ad={};var ns=Object.keys(accounts);for(var i=0;i<ns.length;i++){var n=ns[i];ad[n]={status:accounts[n].status,boundCarrier:accounts[n].boundCarrier||'',boundPremium:accounts[n].boundPremium||'',boundDates:accounts[n].boundDates||[],followupLog:accounts[n].followupLog||[],notesLog:accounts[n].notesLog||[]};}
     localStorage.setItem(SK,JSON.stringify({policies:pd,accounts:ad}));
     localStorage.setItem(SK_NB,JSON.stringify(newBiz));
     localStorage.setItem(SK_RULES,JSON.stringify(rules));
@@ -951,13 +953,16 @@ function renderRenewals() {
   var groups={};
   for(var i=0;i<al.length;i++){
     var a=al[i];
-    if(!isActive(a))continue;
+    if(isCancelled(a))continue;
     if(search&&a.name.toLowerCase().indexOf(search)<0)continue;
     if(adv&&a.advisor!==adv)continue;
     if(urg&&acctUrgClass(a)!==urg)continue;
     if(onlyA&&fireRulesOnAccount(a).length===0)continue;
     for(var j=0;j<a.policies.length;j++){
       var p=a.policies[j];
+      var pdate=p.expDate&&!isNaN(p.expDate)?p.expDate.toDateString():'';
+      if(isDateBound(a,pdate))continue;
+      if(isCompleted(a)&&!(a.boundDates&&a.boundDates.length))continue;
       if(mf){
         if(!p.expDate||isNaN(p.expDate))continue;
         var pk=p.expDate.getFullYear()+'-'+pad(p.expDate.getMonth()+1);
@@ -966,8 +971,8 @@ function renderRenewals() {
       var gk=getGroupKey(p.expDate);
       if(!groups[gk])groups[gk]=[];
       var found=false;
-      for(var k=0;k<groups[gk].length;k++){if(groups[gk][k].acct===a){groups[gk][k].pols.push(p);found=true;break;}}
-      if(!found)groups[gk].push({acct:a,pols:[p]});
+      for(var k=0;k<groups[gk].length;k++){if(groups[gk][k].acct===a&&groups[gk][k].dateKey===pdate){groups[gk][k].pols.push(p);found=true;break;}}
+      if(!found)groups[gk].push({acct:a,pols:[p],dateKey:pdate});
     }
   }
   var keys=Object.keys(groups);
@@ -1025,8 +1030,8 @@ function makeCard(a,visiblePols) {
     var premVal=p.premium||'';
     var premNum=parseFloat(premVal.toString().replace(/[$,]/g,''));
     if(!isNaN(premNum)&&premNum>0)totalPrem+=premNum;
-    var premInp='<div class="pl-premium"><label>💲 Premium</label><input type="text" placeholder="$0" value="'+premVal.replace(/"/g,'&quot;')+'" onchange="setPremium('+p.id+',this.value)" onclick="event.stopPropagation()" onkeydown="event.stopPropagation()"></div>';
-    polLines+='<div class="policy-line"><div class="pl-top"><span class="pl-desc">'+p.description+'</span><span class="pl-carrier">'+p.issuingCompany+'</span><span class="pl-date">'+pd+'</span></div>'+premInp+(chk?'<div class="pl-checks">'+chk+'</div>':'')+(qchk?'<div class="pl-quotes">'+qchk+'</div>':'')+'</div>';
+    var premInp='<div class="pl-premium"><label>💲 Premium</label><input type="text" placeholder="Enter amount" value="'+premVal.replace(/"/g,'&quot;')+'" onchange="setPremium('+p.id+',this.value)" onclick="event.stopPropagation()" onkeydown="event.stopPropagation()"></div>';
+    polLines+='<div class="policy-line"><div class="pl-top"><span class="pl-desc">'+p.description+'</span><div class="pl-meta"><span class="pl-carrier">'+p.issuingCompany+'</span><span class="pl-date">📅 '+pd+'</span></div></div>'+premInp+(chk?'<div class="pl-checks">'+chk+'</div>':'')+(qchk?'<div class="pl-quotes">'+qchk+'</div>':'')+'</div>';
   }
   var premTotalBadge=totalPrem>0?'<span class="pl-prem-total">💲'+totalPrem.toLocaleString('en-US',{minimumFractionDigits:0,maximumFractionDigits:0})+'</span>':'';
   if(!a.followupLog)a.followupLog=[];
@@ -1048,7 +1053,7 @@ function makeCard(a,visiblePols) {
     +alertBanner
     +'<div class="acard-advisor">'
       +'<div class="advisor-tag" style="padding:0 18px 12px">👤 <span>'+a.advisor+'</span></div>'
-      +'<div style="padding:0 18px 12px"><select class="status-select" onchange="setAcctStatus(\''+sn+'\',this,event)">'+shtml+'</select></div>'
+      +'<div style="padding:0 18px 12px"><select class="status-select" onchange="setAcctStatus(\''+sn+'\',this,event,\''+(pols[0].expDate&&!isNaN(pols[0].expDate)?pols[0].expDate.toDateString():'')+'\')">'+shtml+'</select></div>'
     +'</div>'
     +'<div class="policy-lines" id="pl-'+sk+'">'+polLines+'</div>'
     +'<div class="acard-footer">'
@@ -1120,15 +1125,15 @@ function setPremium(id,val) {
   updateStats();
 }
 
-var _boundPending={name:null,sel:null};
-function setAcctStatus(name,sel,e) {
+var _boundPending={name:null,sel:null,prev:null,dateKey:null};
+function setAcctStatus(name,sel,e,dateKey) {
   if(e)e.stopPropagation();
   var a=accounts[name];if(!a)return;
   if(sel.value==='Rewrite'){openRewrite(name,sel);return;}
   var prev=a.status||'';
   if(sel.value==='Bound'){
-    _boundPending={name:name,sel:sel,prev:prev};
-    document.getElementById('boundAcctName').textContent=name;
+    _boundPending={name:name,sel:sel,prev:prev,dateKey:dateKey||null};
+    document.getElementById('boundAcctName').textContent=name+(dateKey?' — '+dateKey:'');
     document.getElementById('boundCarrier').value=a.boundCarrier||'';
     document.getElementById('boundPremium').value=a.boundPremium||'';
     document.getElementById('boundOverlay').classList.remove('hidden');
@@ -1146,17 +1151,30 @@ function setAcctStatus(name,sel,e) {
 function closeBoundModal(){
   document.getElementById('boundOverlay').classList.add('hidden');
   if(_boundPending.sel)_boundPending.sel.value=_boundPending.prev||'';
-  _boundPending={name:null,sel:null,prev:null};
+  _boundPending={name:null,sel:null,prev:null,dateKey:null};
 }
 function confirmBound(){
   var name=_boundPending.name;if(!name)return;
   var a=accounts[name];if(!a)return;
   a.boundCarrier=document.getElementById('boundCarrier').value.trim();
   a.boundPremium=document.getElementById('boundPremium').value.trim();
-  a.status='Bound';
+  // Track which date group was bound
+  var dk=_boundPending.dateKey;
+  if(dk){
+    if(!a.boundDates)a.boundDates=[];
+    if(a.boundDates.indexOf(dk)<0)a.boundDates.push(dk);
+  }
+  // Check if all date groups are now bound — if so, mark whole account Bound
+  var allBound=true;
+  for(var i=0;i<a.policies.length;i++){
+    var pd=a.policies[i].expDate&&!isNaN(a.policies[i].expDate)?a.policies[i].expDate.toDateString():'';
+    if(!isDateBound(a,pd)){allBound=false;break;}
+  }
+  if(allBound)a.status='Bound'; else a.status=a.status==='Bound'?'In Progress':a.status;
   document.getElementById('boundOverlay').classList.add('hidden');
-  _boundPending={name:null,sel:null,prev:null};
+  _boundPending={name:null,sel:null,prev:null,dateKey:null};
   updateStats();renderActions();renderRenewals();renderCompleted();
+  saveAll();
 }
 
 function addFL(name,e) {
