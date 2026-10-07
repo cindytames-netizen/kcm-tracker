@@ -163,7 +163,11 @@ header{background:linear-gradient(135deg,var(--sky-dark),var(--green));padding:0
     <input type="file" id="fileInput" accept=".xlsx,.xls,.csv" onchange="handleFile(event)" style="display:none">
     <button class="hbtn" onclick="saveAll()">💾 Save</button>
     <button class="hbtn" onclick="exportCSV()">⬇ Export</button>
+    <button class="hbtn" id="syncPullBtn" onclick="syncPull()" title="Pull latest from cloud">☁️ Pull</button>
+    <button class="hbtn" id="syncPushBtn" onclick="syncPush()" title="Push your data to cloud">⬆️ Push</button>
+    <button class="hbtn" onclick="openSyncConfig()" title="Cloud sync settings" style="padding:8px 10px;">⚙️</button>
     <span class="saved-tag" id="savedTag">✔ Saved!</span>
+    <span class="saved-tag" id="syncTag" style="background:rgba(255,255,255,0.9);color:#1a6fa8;display:none;"></span>
   </div>
 </header>
 
@@ -339,6 +343,31 @@ header{background:linear-gradient(135deg,var(--sky-dark),var(--green));padding:0
   <div class="modal-footer">
     <button class="mbtn mbtn-cancel" onclick="closeBoundModal()">Cancel</button>
     <button class="mbtn mbtn-save" onclick="confirmBound()">✅ Confirm Bound</button>
+  </div>
+</div>
+</div>
+
+<!-- Sync Config Modal -->
+<div class="modal-overlay hidden" id="syncOverlay" onclick="if(event.target===this)closeSyncConfig()">
+<div class="modal">
+  <div class="modal-header"><h2>☁️ Cloud Sync Setup</h2><p style="font-size:12px;color:var(--muted);margin-top:6px;">Both you and your teammate enter the same Bin ID and API Key so you share the same data.</p></div>
+  <div class="modal-body">
+    <div class="field-group">
+      <label>JSONBin Bin ID</label>
+      <input id="syncBinId" placeholder="e.g. 64abc123def456..." style="font-family:monospace;font-size:12px;">
+      <p style="font-size:11px;color:var(--muted);margin-top:4px;">From <strong>jsonbin.io</strong> → Create a Bin → copy the Bin ID</p>
+    </div>
+    <div class="field-group">
+      <label>API Key (Master Key)</label>
+      <input id="syncApiKey" placeholder="$2a$10$..." type="password" style="font-family:monospace;font-size:12px;">
+      <p style="font-size:11px;color:var(--muted);margin-top:4px;">From jsonbin.io → Account → API Keys → Master Key</p>
+    </div>
+    <div id="syncStatus" style="font-size:12px;padding:8px 0;color:var(--muted);min-height:20px;"></div>
+  </div>
+  <div class="modal-footer">
+    <button class="mbtn mbtn-cancel" onclick="closeSyncConfig()">Close</button>
+    <button class="mbtn" style="background:#e8f4fd;color:#1a6fa8;" onclick="testSyncConnection()">🔗 Test Connection</button>
+    <button class="mbtn mbtn-save" onclick="saveSyncConfig()">Save Settings</button>
   </div>
 </div>
 </div>
@@ -750,7 +779,15 @@ function isTruthy(v) {
   return s==='yes'||s==='y'||s==='1'||s==='x'||s==='true'||s==='sent'||s==='done'||s==='complete'||s==='submitted'||s==='received';
 }
 
-function isCompleted(a) { return (a.status||'').toLowerCase()==='bound'; }
+function allChecksComplete(a) {
+  if(!a.policies||!a.policies.length)return false;
+  for(var i=0;i<a.policies.length;i++){
+    var p=a.policies[i];
+    for(var j=0;j<CHK.length;j++){if(!isTruthy(p[CHK[j].k]))return false;}
+  }
+  return true;
+}
+function isCompleted(a) { return (a.status||'').toLowerCase()==='bound' && allChecksComplete(a); }
 function isCancelled(a) { return (a.status||'').toLowerCase()==='cancelled'; }
 function isActive(a) { return !isCompleted(a) && !isCancelled(a); }
 function isDateBound(a,dateKey) { return a.boundDates&&a.boundDates.indexOf(dateKey)>=0; }
@@ -840,6 +877,103 @@ function saveAll() {
     var t=document.getElementById('savedTag');t.style.display='inline-block';setTimeout(function(){t.style.display='none';},2500);
   } catch(e){alert('Save failed: '+e.message);}
 }
+
+// ── Cloud Sync (JSONBin.io) ──────────────────────────────────────────────────
+var SK_SYNC='kcm_sync_cfg';
+function getSyncCfg(){try{return JSON.parse(localStorage.getItem(SK_SYNC)||'{}');}catch(e){return {};}}
+function saveSyncConfig(){
+  var binId=document.getElementById('syncBinId').value.trim();
+  var apiKey=document.getElementById('syncApiKey').value.trim();
+  if(!binId||!apiKey){document.getElementById('syncStatus').innerHTML='<span style="color:var(--red)">Both fields are required.</span>';return;}
+  localStorage.setItem(SK_SYNC,JSON.stringify({binId:binId,apiKey:apiKey}));
+  document.getElementById('syncStatus').innerHTML='<span style="color:var(--green-dark)">✔ Settings saved!</span>';
+  setTimeout(closeSyncConfig,1000);
+}
+function openSyncConfig(){
+  var cfg=getSyncCfg();
+  document.getElementById('syncBinId').value=cfg.binId||'';
+  document.getElementById('syncApiKey').value=cfg.apiKey||'';
+  document.getElementById('syncStatus').innerHTML='';
+  document.getElementById('syncOverlay').classList.remove('hidden');
+}
+function closeSyncConfig(){document.getElementById('syncOverlay').classList.add('hidden');}
+
+function getSyncPayload(){
+  var pd={};
+  for(var i=0;i<policies.length;i++){var p=policies[i];pd[p.id]={premium:p.premium||'',docuSign:p.docuSign,submitted:p.submitted,epicBilled:p.epicBilled,certsLender:p.certsLender,binder:p.binder,policySent:p.policySent,quoteGL:p.quoteGL,quoteProp:p.quoteProp,quoteUmb:p.quoteUmb,quoteWC:p.quoteWC,quoteFlood:p.quoteFlood,quoteBond:p.quoteBond};}
+  var ad={};var ns=Object.keys(accounts);
+  for(var i=0;i<ns.length;i++){var n=ns[i];ad[n]={status:accounts[n].status,boundCarrier:accounts[n].boundCarrier||'',boundPremium:accounts[n].boundPremium||'',boundDates:accounts[n].boundDates||[],followupLog:accounts[n].followupLog||[],notesLog:accounts[n].notesLog||[]};}
+  return {policies:pd,accounts:ad,newBiz:newBiz,rules:rules,syncedAt:new Date().toISOString()};
+}
+
+function showSyncTag(msg,color){
+  var t=document.getElementById('syncTag');
+  t.textContent=msg;t.style.color=color||'#1a6fa8';t.style.display='inline-block';
+  setTimeout(function(){t.style.display='none';},3000);
+}
+function setSyncBtnState(loading){
+  document.getElementById('syncPushBtn').disabled=loading;
+  document.getElementById('syncPullBtn').disabled=loading;
+}
+
+function testSyncConnection(){
+  var cfg=getSyncCfg();
+  var binId=document.getElementById('syncBinId').value.trim()||cfg.binId;
+  var apiKey=document.getElementById('syncApiKey').value.trim()||cfg.apiKey;
+  var el=document.getElementById('syncStatus');
+  if(!binId||!apiKey){el.innerHTML='<span style="color:var(--red)">Enter Bin ID and API Key first.</span>';return;}
+  el.innerHTML='Testing…';
+  fetch('https://api.jsonbin.io/v3/b/'+binId+'/latest',{headers:{'X-Master-Key':apiKey}})
+    .then(function(r){return r.json();})
+    .then(function(d){
+      if(d.record)el.innerHTML='<span style="color:var(--green-dark)">✔ Connected! Last synced: '+(d.record.syncedAt?new Date(d.record.syncedAt).toLocaleString():'never')+'</span>';
+      else el.innerHTML='<span style="color:var(--red)">Connected but bin is empty — Push first to initialize.</span>';
+    })
+    .catch(function(e){el.innerHTML='<span style="color:var(--red)">❌ Failed: '+e.message+'</span>';});
+}
+
+function syncPush(){
+  var cfg=getSyncCfg();
+  if(!cfg.binId||!cfg.apiKey){openSyncConfig();document.getElementById('syncStatus').innerHTML='<span style="color:var(--red)">Set up your Bin ID and API Key first.</span>';return;}
+  setSyncBtnState(true);
+  showSyncTag('Pushing…','#1a6fa8');
+  fetch('https://api.jsonbin.io/v3/b/'+cfg.binId,{
+    method:'PUT',
+    headers:{'Content-Type':'application/json','X-Master-Key':cfg.apiKey,'X-Bin-Versioning':'false'},
+    body:JSON.stringify(getSyncPayload())
+  })
+  .then(function(r){return r.json();})
+  .then(function(d){
+    setSyncBtnState(false);
+    if(d.record){showSyncTag('☁️ Pushed! '+new Date().toLocaleTimeString(),'#1a6fa8');}
+    else{showSyncTag('Push failed','var(--red)');}
+  })
+  .catch(function(e){setSyncBtnState(false);showSyncTag('Push error: '+e.message,'var(--red)');});
+}
+
+function syncPull(){
+  var cfg=getSyncCfg();
+  if(!cfg.binId||!cfg.apiKey){openSyncConfig();document.getElementById('syncStatus').innerHTML='<span style="color:var(--red)">Set up your Bin ID and API Key first.</span>';return;}
+  setSyncBtnState(true);
+  showSyncTag('Pulling…','#1a6fa8');
+  fetch('https://api.jsonbin.io/v3/b/'+cfg.binId+'/latest',{headers:{'X-Master-Key':cfg.apiKey}})
+  .then(function(r){return r.json();})
+  .then(function(d){
+    setSyncBtnState(false);
+    if(!d.record){showSyncTag('Nothing in cloud yet','var(--muted)');return;}
+    var rec=d.record;
+    // Merge policies
+    if(rec.policies){for(var i=0;i<policies.length;i++){var pd=rec.policies[policies[i].id];if(pd)Object.assign(policies[i],pd);}}
+    // Merge accounts
+    if(rec.accounts){var ns=Object.keys(rec.accounts);for(var i=0;i<ns.length;i++){var n=ns[i];if(accounts[n])Object.assign(accounts[n],{status:rec.accounts[n].status||'',boundCarrier:rec.accounts[n].boundCarrier||'',boundPremium:rec.accounts[n].boundPremium||'',boundDates:rec.accounts[n].boundDates||[],followupLog:rec.accounts[n].followupLog||[],notesLog:rec.accounts[n].notesLog||[]});}}
+    if(rec.newBiz)newBiz=rec.newBiz;
+    if(rec.rules)rules=rec.rules;
+    saveAll();populateFilters();updateStats();renderRenewals();renderActions();renderCompleted();renderCancelled();
+    showSyncTag('☁️ Pulled! '+new Date().toLocaleTimeString(),'#1a6fa8');
+  })
+  .catch(function(e){setSyncBtnState(false);showSyncTag('Pull error: '+e.message,'var(--red)');});
+}
+// ────────────────────────────────────────────────────────────────────────────
 
 function exportCSV() {
   var rows='Account,Advisor,Status,Exp Date,Policies\n';
@@ -954,6 +1088,7 @@ function renderRenewals() {
   for(var i=0;i<al.length;i++){
     var a=al[i];
     if(isCancelled(a))continue;
+    if(isCompleted(a))continue;
     if(search&&a.name.toLowerCase().indexOf(search)<0)continue;
     if(adv&&a.advisor!==adv)continue;
     if(urg&&acctUrgClass(a)!==urg)continue;
@@ -962,7 +1097,6 @@ function renderRenewals() {
       var p=a.policies[j];
       var pdate=p.expDate&&!isNaN(p.expDate)?p.expDate.toDateString():'';
       if(isDateBound(a,pdate))continue;
-      if(isCompleted(a)&&!(a.boundDates&&a.boundDates.length))continue;
       if(mf){
         if(!p.expDate||isNaN(p.expDate))continue;
         var pk=p.expDate.getFullYear()+'-'+pad(p.expDate.getMonth()+1);
@@ -1101,7 +1235,11 @@ function togglePol(id,field,el,e) {
     if(pill){if(na.length)pill.textContent='⚠️ '+na.length;else pill.remove();}
     card.classList.toggle('has-alerts',na.length>0);
   }
-  updateStats();renderActions();
+  // If account is Bound, check if all boxes are now done → move to Completed
+  if(acct&&isCompleted(acct)){
+    updateStats();renderActions();renderRenewals();renderCompleted();saveAll();return;
+  }
+  updateStats();renderActions();saveAll();
 }
 
 function setPremium(id,val) {
@@ -1164,13 +1302,8 @@ function confirmBound(){
     if(!a.boundDates)a.boundDates=[];
     if(a.boundDates.indexOf(dk)<0)a.boundDates.push(dk);
   }
-  // Check if all date groups are now bound — if so, mark whole account Bound
-  var allBound=true;
-  for(var i=0;i<a.policies.length;i++){
-    var pd=a.policies[i].expDate&&!isNaN(a.policies[i].expDate)?a.policies[i].expDate.toDateString():'';
-    if(!isDateBound(a,pd)){allBound=false;break;}
-  }
-  if(allBound)a.status='Bound'; else a.status=a.status==='Bound'?'In Progress':a.status;
+  // Mark status as Bound (account stays on renewals board until all checkboxes are checked)
+  a.status='Bound';
   document.getElementById('boundOverlay').classList.add('hidden');
   _boundPending={name:null,sel:null,prev:null,dateKey:null};
   updateStats();renderActions();renderRenewals();renderCompleted();
