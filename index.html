@@ -1016,12 +1016,12 @@ function makeCard(a,visiblePols) {
   for(var i=0;i<nl.length;i++)nlItems+='<div class="fl-item"><span class="fl-date">'+nl[i].date+'</span><span>'+nl[i].text+'</span><button class="fl-del" onclick="delNote(\''+sn+'\','+i+',event)">✕</button></div>';
   var nlPanel='<div class="acard-followup-panel" id="nl-'+sk+'">'+nlItems+'<div class="add-fl-row"><input id="nl-inp-'+sk+'" placeholder="Add a note..." onclick="event.stopPropagation()"><button class="add-fl-btn" style="background:var(--sky)" onclick="addNote(\''+sn+'\',event)">Add</button></div></div>';
   return '<div class="acard '+urgC+(alerts.length?' has-alerts':'')+'" id="acard-'+sk+'">'
-    +alertBanner
     +'<div class="acard-header">'
       +'<div class="acard-name">'+a.name+'</div>'
       +'<div class="acard-meta"><span class="days-badge '+dbC+'">📅 '+dbT+'</span><span class="policy-count" onclick="togglePolicies(\''+sk+'\',this,event)">'+cntLabel+'</span>'+alertPill+'</div>'
       +'<div style="font-size:11px;color:var(--muted);">📆 '+dateStr+'</div>'
     +'</div>'
+    +alertBanner
     +'<div class="acard-advisor">'
       +'<div class="advisor-tag" style="padding:0 18px 12px">👤 <span>'+a.advisor+'</span></div>'
       +'<div style="padding:0 18px 12px"><select class="status-select" onchange="setAcctStatus(\''+sn+'\',this,event)">'+shtml+'</select></div>'
@@ -1067,7 +1067,7 @@ function togglePol(id,field,el,e) {
   var card=document.getElementById('acard-'+p.accountName.replace(/\W/g,'_'));
   if(card){
     var ex=card.querySelector('.acard-alerts');if(ex)ex.remove();
-    if(na.length){var msgs={};for(var i=0;i<na.length;i++)msgs[na[i].msg]=1;var uk=Object.keys(msgs);var div=document.createElement('div');div.className='acard-alerts';for(var i=0;i<uk.length;i++){var d=document.createElement('div');d.className='alert-item';d.textContent='⚠️ '+uk[i];div.appendChild(d);}card.insertBefore(div,card.firstChild);}
+    if(na.length){var msgs={};for(var i=0;i<na.length;i++)msgs[na[i].msg]=1;var uk=Object.keys(msgs);var div=document.createElement('div');div.className='acard-alerts';for(var i=0;i<uk.length;i++){var d=document.createElement('div');d.className='alert-item';d.textContent='⚠️ '+uk[i];div.appendChild(d);}var hdr=card.querySelector('.acard-header');if(hdr&&hdr.nextSibling){card.insertBefore(div,hdr.nextSibling);}else{card.insertBefore(div,card.firstChild);}}
     var pill=card.querySelector('.alert-pill');
     if(pill){if(na.length)pill.textContent='⚠️ '+na.length;else pill.remove();}
     card.classList.toggle('has-alerts',na.length>0);
