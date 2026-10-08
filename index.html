@@ -1155,9 +1155,9 @@ function makeCard(a,visiblePols) {
   var dateStr=dates.length?fmtD(dates[0]):'—';
   var vc=pols.length,tc=a.policies.length;
   var cntLabel=vc<tc?'📋 '+vc+' of '+tc+' policies':'📋 '+vc+' polic'+(vc===1?'y':'ies');
-  var sk=a.name.replace(/\W/g,'_');
-  var sn=a.name.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
   var cardDateKey=pols[0]&&pols[0].expDate&&!isNaN(pols[0].expDate)?pols[0].expDate.toDateString():'';
+  var sk=(a.name+'_'+cardDateKey).replace(/\W/g,'_');
+  var sn=a.name.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
   var st=(a.dateStatuses&&cardDateKey&&a.dateStatuses[cardDateKey])||(!cardDateKey?a.status:'')||'';
   var sopts=['','Active','In Progress','Pending','Proposed','Quoted','Bound','Cancelled','Non-Renewal','Rewrite'];
   var shtml='';for(var i=0;i<sopts.length;i++)shtml+='<option'+(st===sopts[i]?' selected':'')+'>'+(sopts[i]||'— Status —')+'</option>';
