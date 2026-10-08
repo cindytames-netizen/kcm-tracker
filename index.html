@@ -1566,7 +1566,7 @@ function handleFile(e){
       for(var ci=0;ci<hm[key].length;ci++){for(var hi=0;hi<headers.length;hi++){if(headers[hi].toLowerCase().trim().replace(/\s+/g,' ')===hm[key][ci]){cols[key]=hi;break;}}if(cols[key]>=0)break;}
     }
     var savedE={};for(var i=0;i<policies.length;i++){var p=policies[i];savedE[p.accountName+'||'+p.description]={premium:p.premium||'',docuSign:p.docuSign,submitted:p.submitted,epicBilled:p.epicBilled,certsLender:p.certsLender,binder:p.binder,policySent:p.policySent,quoteGL:p.quoteGL,quoteProp:p.quoteProp,quoteUmb:p.quoteUmb,quoteWC:p.quoteWC,quoteFlood:p.quoteFlood,quoteBond:p.quoteBond};}
-    var savedA={};var ans=Object.keys(accounts);for(var i=0;i<ans.length;i++)savedA[ans[i]]={status:accounts[ans[i]].status,followupLog:accounts[ans[i]].followupLog||[]};
+    var savedA={};var ans=Object.keys(accounts);for(var i=0;i<ans.length;i++)savedA[ans[i]]={status:accounts[ans[i]].status,boundCarrier:accounts[ans[i]].boundCarrier||'',boundPremium:accounts[ans[i]].boundPremium||'',boundDates:accounts[ans[i]].boundDates||[],followupLog:accounts[ans[i]].followupLog||[],notesLog:accounts[ans[i]].notesLog||[]};
     var newRAW=[];
     for(var i=hr+1;i<raw.length;i++){
       var row=raw[i];var hasVal=false;for(var j=0;j<row.length;j++){if(row[j]!==''){hasVal=true;break;}}if(!hasVal)continue;
@@ -1583,7 +1583,7 @@ function handleFile(e){
     RAW.length=0;var mv=Object.values(mm);for(var i=0;i<mv.length;i++)RAW.push(mv[i]);
     buildData();
     for(var i=0;i<policies.length;i++){var se=savedE[policies[i].accountName+'||'+policies[i].description];if(se)Object.assign(policies[i],se);}
-    var rns=Object.keys(accounts);for(var i=0;i<rns.length;i++){var sa=savedA[rns[i]];if(sa)Object.assign(accounts[rns[i]],{status:sa.status||'',followupLog:sa.followupLog||[]});}
+    var rns=Object.keys(accounts);for(var i=0;i<rns.length;i++){var sa=savedA[rns[i]];if(sa)Object.assign(accounts[rns[i]],{status:sa.status||'',boundCarrier:sa.boundCarrier||'',boundPremium:sa.boundPremium||'',boundDates:sa.boundDates||[],followupLog:sa.followupLog||[],notesLog:sa.notesLog||[]});}
     saveAll();populateFilters();updateStats();renderRenewals();renderActions();
     var an=Object.keys(accounts);document.getElementById('headerSub').textContent=an.length+' accounts · '+policies.length+' policies · uploaded '+new Date().toLocaleDateString();
     document.getElementById('tb-renewals').textContent=an.length;
