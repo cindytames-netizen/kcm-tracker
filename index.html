@@ -829,6 +829,8 @@ function checkToddRule(pol,acct) {
 
 function fireRulesOnPolicy(pol,acct) {
   if(isCompleted(acct))return[];
+  var pdate=pol.expDate&&!isNaN(pol.expDate)?pol.expDate.toDateString():'';
+  if(isCardComplete(acct,pdate))return[];
   var alerts=[];
   if(checkToddRule(pol,acct)) alerts.push({msg:'Submit property quote to RISKTHE-01',severity:'warn',polId:pol.id,desc:pol.description});
   for(var i=0;i<rules.length;i++) {
@@ -1708,6 +1710,27 @@ function init(){
   var an=Object.keys(accounts);
   document.getElementById('headerSub').textContent=an.length+' accounts · '+policies.length+' policies · '+today.toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'});
   document.getElementById('tb-renewals').textContent=an.length;
+  // Auto-pull from cloud on load to ensure latest data is always shown
+  autoSyncPull();
+}
+
+function autoSyncPull(){
+  var url=getSyncUrl();
+  if(!url)return;
+  gasGet(url,{action:'load'},function(d){
+    if(!d.ok||!d.data||!d.data.policies)return;
+    var rec=d.data;
+    try{
+      var pd=typeof rec.policies==='string'?JSON.parse(rec.policies):rec.policies;
+      var ad=typeof rec.accounts==='string'?JSON.parse(rec.accounts):rec.accounts;
+      if(pd){for(var i=0;i<policies.length;i++){var ps=pd[policies[i].id];if(ps)Object.assign(policies[i],ps);}}
+      if(ad){var ns=Object.keys(ad);for(var i=0;i<ns.length;i++){var n=ns[i];if(accounts[n])Object.assign(accounts[n],{status:ad[n].status||'',boundCarrier:ad[n].boundCarrier||'',boundPremium:ad[n].boundPremium||'',boundDates:ad[n].boundDates||[],dateStatuses:ad[n].dateStatuses||{},followupLog:ad[n].followupLog||[],notesLog:ad[n].notesLog||[]});}}
+      if(rec.newBiz){try{newBiz=typeof rec.newBiz==='string'?JSON.parse(rec.newBiz):rec.newBiz;}catch(e){}}
+      if(rec.rules){try{rules=typeof rec.rules==='string'?JSON.parse(rec.rules):rec.rules;}catch(e){}}
+      saveAll();populateFilters();updateStats();renderRenewals();renderActions();renderCompleted();renderCancelled();
+      showSyncTag('☁️ Synced','#1a6fa8');
+    }catch(e){console.warn('Auto-sync pull failed:',e);}
+  });
 }
 
 init();
