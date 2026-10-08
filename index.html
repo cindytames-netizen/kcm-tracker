@@ -334,11 +334,10 @@ header{background:linear-gradient(135deg,var(--sky-dark),var(--green));padding:0
 </div>
 
 <div class="modal-overlay hidden" id="boundOverlay" onclick="if(event.target===this)closeBoundModal()">
-<div class="modal">
+<div class="modal" style="max-width:560px;">
   <div class="modal-header"><h2>✅ Mark as Bound</h2><p id="boundAcctName" style="font-size:13px;font-weight:700;color:var(--text);margin-top:4px;"></p></div>
   <div class="modal-body">
-    <div class="field-group"><label>Bound Carrier</label><input id="boundCarrier" placeholder="e.g. Travelers, Nationwide…"></div>
-    <div class="field-group"><label>Bound Premium</label><input id="boundPremium" placeholder="e.g. $12,500" type="text"></div>
+    <div id="boundPolLines" style="display:flex;flex-direction:column;gap:14px;"></div>
   </div>
   <div class="modal-footer">
     <button class="mbtn mbtn-cancel" onclick="closeBoundModal()">Cancel</button>
@@ -879,7 +878,7 @@ function loadSaved() {
 function saveAll() {
   try {
     var pd={};
-    for(var i=0;i<policies.length;i++){var p=policies[i];pd[p.id]={premium:p.premium||'',docuSign:p.docuSign,submitted:p.submitted,epicBilled:p.epicBilled,certsLender:p.certsLender,binder:p.binder,policySent:p.policySent,quoteGL:p.quoteGL,quoteProp:p.quoteProp,quoteUmb:p.quoteUmb,quoteWC:p.quoteWC,quoteFlood:p.quoteFlood,quoteBond:p.quoteBond};}
+    for(var i=0;i<policies.length;i++){var p=policies[i];pd[p.id]={premium:p.premium||'',boundCarrier:p.boundCarrier||'',boundPremium:p.boundPremium||'',docuSign:p.docuSign,submitted:p.submitted,epicBilled:p.epicBilled,certsLender:p.certsLender,binder:p.binder,policySent:p.policySent,quoteGL:p.quoteGL,quoteProp:p.quoteProp,quoteUmb:p.quoteUmb,quoteWC:p.quoteWC,quoteFlood:p.quoteFlood,quoteBond:p.quoteBond};}
     var ad={};var ns=Object.keys(accounts);for(var i=0;i<ns.length;i++){var n=ns[i];ad[n]={status:accounts[n].status,boundCarrier:accounts[n].boundCarrier||'',boundPremium:accounts[n].boundPremium||'',boundDates:accounts[n].boundDates||[],dateStatuses:accounts[n].dateStatuses||{},followupLog:accounts[n].followupLog||[],notesLog:accounts[n].notesLog||[]};}
     localStorage.setItem(SK,JSON.stringify({policies:pd,accounts:ad}));
     localStorage.setItem(SK_NB,JSON.stringify(newBiz));
@@ -910,7 +909,7 @@ function closeSyncConfig(){document.getElementById('syncOverlay').classList.add(
 
 function getSyncPayload(){
   var pd={};
-  for(var i=0;i<policies.length;i++){var p=policies[i];pd[p.id]={premium:p.premium||'',docuSign:p.docuSign,submitted:p.submitted,epicBilled:p.epicBilled,certsLender:p.certsLender,binder:p.binder,policySent:p.policySent,quoteGL:p.quoteGL,quoteProp:p.quoteProp,quoteUmb:p.quoteUmb,quoteWC:p.quoteWC,quoteFlood:p.quoteFlood,quoteBond:p.quoteBond};}
+  for(var i=0;i<policies.length;i++){var p=policies[i];pd[p.id]={premium:p.premium||'',boundCarrier:p.boundCarrier||'',boundPremium:p.boundPremium||'',docuSign:p.docuSign,submitted:p.submitted,epicBilled:p.epicBilled,certsLender:p.certsLender,binder:p.binder,policySent:p.policySent,quoteGL:p.quoteGL,quoteProp:p.quoteProp,quoteUmb:p.quoteUmb,quoteWC:p.quoteWC,quoteFlood:p.quoteFlood,quoteBond:p.quoteBond};}
   var ad={};var ns=Object.keys(accounts);
   for(var i=0;i<ns.length;i++){var n=ns[i];ad[n]={status:accounts[n].status,boundCarrier:accounts[n].boundCarrier||'',boundPremium:accounts[n].boundPremium||'',boundDates:accounts[n].boundDates||[],followupLog:accounts[n].followupLog||[],notesLog:accounts[n].notesLog||[]};}
   return {policies:pd,accounts:ad,newBiz:newBiz,rules:rules,syncedAt:new Date().toISOString()};
@@ -1298,10 +1297,29 @@ function setAcctStatus(name,sel,e,dateKey) {
   if(sel.value==='Bound'){
     _boundPending={name:name,sel:sel,prev:prev,dateKey:dateKey||null};
     document.getElementById('boundAcctName').textContent=name+(dateKey?' — '+dateKey:'');
-    document.getElementById('boundCarrier').value=a.boundCarrier||'';
-    document.getElementById('boundPremium').value=a.boundPremium||'';
+    // Build per-policy input rows for this card's dateKey
+    var cardPols=[];
+    for(var ci=0;ci<a.policies.length;ci++){
+      var cp=a.policies[ci];
+      var cpdk=cp.expDate&&!isNaN(cp.expDate)?cp.expDate.toDateString():'';
+      if(!dateKey||cpdk===dateKey)cardPols.push(cp);
+    }
+    var linesHtml='';
+    for(var ci=0;ci<cardPols.length;ci++){
+      var cp=cardPols[ci];
+      var savedCarrier=(cp.boundCarrier)||'';
+      var savedPremium=(cp.boundPremium)||a.boundPremium||'';
+      linesHtml+='<div style="background:#f7fafd;border:1.5px solid var(--border);border-radius:10px;padding:12px 14px;">'
+        +'<div style="font-size:12px;font-weight:700;color:var(--text);margin-bottom:10px;">📋 '+cp.description+'</div>'
+        +'<div style="display:flex;gap:10px;flex-wrap:wrap;">'
+        +'<div class="field-group" style="flex:1;min-width:140px;margin:0"><label>Carrier</label><input data-polid="'+cp.id+'" data-field="carrier" placeholder="e.g. Travelers…" value="'+savedCarrier.replace(/"/g,'&quot;')+'"></div>'
+        +'<div class="field-group" style="flex:1;min-width:120px;margin:0"><label>Premium</label><input data-polid="'+cp.id+'" data-field="premium" placeholder="e.g. $12,500" value="'+savedPremium.replace(/"/g,'&quot;')+'"></div>'
+        +'</div>'
+        +'</div>';
+    }
+    document.getElementById('boundPolLines').innerHTML=linesHtml;
     document.getElementById('boundOverlay').classList.remove('hidden');
-    setTimeout(function(){document.getElementById('boundCarrier').focus();},100);
+    setTimeout(function(){var f=document.querySelector('#boundPolLines input');if(f)f.focus();},100);
     return;
   }
   if(sel.value==='Cancelled'){
@@ -1320,8 +1338,24 @@ function closeBoundModal(){
 function confirmBound(){
   var name=_boundPending.name;if(!name)return;
   var a=accounts[name];if(!a)return;
-  a.boundCarrier=document.getElementById('boundCarrier').value.trim();
-  a.boundPremium=document.getElementById('boundPremium').value.trim();
+  // Save per-policy carrier and premium from modal inputs
+  var inputs=document.querySelectorAll('#boundPolLines input');
+  for(var ci=0;ci<inputs.length;ci++){
+    var inp=inputs[ci];
+    var pid=parseInt(inp.getAttribute('data-polid'));
+    var field=inp.getAttribute('data-field');
+    for(var pi=0;pi<policies.length;pi++){
+      if(policies[pi].id===pid){
+        if(field==='carrier')policies[pi].boundCarrier=inp.value.trim();
+        if(field==='premium'){policies[pi].boundPremium=inp.value.trim();policies[pi].premium=inp.value.trim();}
+        break;
+      }
+    }
+  }
+  // Also store first carrier/premium on account level for display in completed tab
+  var firstCarrier='',firstPremium='';
+  for(var ci=0;ci<inputs.length;ci++){var inp=inputs[ci];if(inp.getAttribute('data-field')==='carrier'&&!firstCarrier)firstCarrier=inp.value.trim();if(inp.getAttribute('data-field')==='premium'&&!firstPremium)firstPremium=inp.value.trim();}
+  a.boundCarrier=firstCarrier;a.boundPremium=firstPremium;
   // Track which date group was bound
   var dk=_boundPending.dateKey;
   if(dk){
@@ -1428,9 +1462,16 @@ function renderCompleted() {
       var ds=dates.length?dates[0].toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}):'—';
       var sn=a.name.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
       var dkEsc=dk.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
-      var bcarrier=a.boundCarrier?'🏢 '+a.boundCarrier:'';
-      var bprem=a.boundPremium?'💲 '+a.boundPremium:'';
-      var boundInfo=(bcarrier||bprem)?'<div style="font-size:11px;color:var(--green-dark);padding:2px 18px 10px;font-weight:600;">'+(bcarrier?bcarrier:'')+(bcarrier&&bprem?' · ':'')+bprem+'</div>':'';
+      var boundLines='';
+      for(var m=0;m<pols.length;m++){
+        var bp=pols[m];
+        var bline='<div style="font-size:11px;color:var(--text);padding:1px 0;"><span style="font-weight:700;">'+bp.description+'</span>';
+        if(bp.boundCarrier)bline+=' · 🏢 '+bp.boundCarrier;
+        if(bp.boundPremium)bline+=' · 💲 '+bp.boundPremium;
+        bline+='</div>';
+        boundLines+=bline;
+      }
+      var boundInfo=boundLines?'<div style="padding:2px 18px 10px;">'+boundLines+'</div>':'';
       cards+='<div class="acard urg-green" style="border-left-color:var(--green)">'
         +'<div class="comp-banner"><span style="font-size:12px;font-weight:700;color:var(--green-dark)">✅ Bound & Complete</span></div>'
         +'<div class="acard-header"><div class="acard-name">'+a.name+'</div><div class="acard-meta"><span class="days-badge db-green">📅 '+ds+'</span><span class="policy-count">📋 '+pols.length+' polic'+(pols.length===1?'y':'ies')+'</span>'+(bprem?'<span class="pl-prem-total">'+bprem+'</span>':'')+'</div></div>'
