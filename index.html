@@ -922,22 +922,37 @@ function setSyncBtnState(loading){
   document.getElementById('syncPullBtn').disabled=loading;
 }
 
-function gasGet(url,params,cb){
+function gasCall(url,params,cb){
+  // Use JSONP via script tag to avoid CORS issues with Google Apps Script
+  var cbName='_gas_cb_'+Date.now()+'_'+Math.floor(Math.random()*9999);
+  var timer=setTimeout(function(){
+    window[cbName]=null;if(s.parentNode)s.parentNode.removeChild(s);
+    cb({ok:false,error:'Timeout — check your Apps Script deployment'});
+  },30000);
+  window[cbName]=function(d){
+    clearTimeout(timer);window[cbName]=null;if(s.parentNode)s.parentNode.removeChild(s);cb(d);
+  };
+  params.callback=cbName;
   var qs=Object.keys(params).map(function(k){return encodeURIComponent(k)+'='+encodeURIComponent(params[k]);}).join('&');
-  fetch(url+'?'+qs).then(function(r){return r.json();}).then(cb).catch(function(e){cb({ok:false,error:e.message});});
+  var s=document.createElement('script');s.src=url+'?'+qs;
+  s.onerror=function(){clearTimeout(timer);window[cbName]=null;cb({ok:false,error:'Script load failed — check Apps Script URL'});};
+  document.head.appendChild(s);
 }
-function gasPost(url,data,cb){
-  fetch(url,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify(data)})
-    .then(function(r){return r.json();}).then(cb).catch(function(e){cb({ok:false,error:e.message});});
-}
+function gasGet(url,params,cb){gasCall(url,params,cb);}
+function gasPost(url,data,cb){gasCall(url,data,cb);}
 
 function testSyncConnection(){
   var url=document.getElementById('syncBinId').value.trim()||getSyncUrl();
   var el=document.getElementById('syncStatus');
-  el.innerHTML='Testing…';
+  el.innerHTML='<span style="color:#1a6fa8">⏳ Step 1/2: Pinging Apps Script…</span>';
   gasGet(url,{action:'ping'},function(d){
-    if(d.ok)el.innerHTML='<span style="color:var(--green-dark)">✔ Connected to Google Apps Script!</span>';
-    else el.innerHTML='<span style="color:var(--red)">❌ Could not connect: '+(d.error||'unknown error')+'</span>';
+    if(!d.ok){el.innerHTML='<span style="color:var(--red)">❌ Ping failed: '+(d.error||'no response')+'<br>Check that your Apps Script is deployed as "Anyone" (web app).</span>';return;}
+    el.innerHTML='<span style="color:#1a6fa8">⏳ Step 2/2: Testing read (load)…</span>';
+    gasGet(url,{action:'load'},function(d3){
+      if(!d3.ok){el.innerHTML='<span style="color:var(--red)">❌ Read test failed: '+(d3.error||'load error')+'</span>';return;}
+      var hasPolicies=d3.data&&d3.data.policies;
+      el.innerHTML='<span style="color:var(--green-dark)">✅ Connected! '+(hasPolicies?'Saved data found in Google Sheets.':'No data yet — Push to store your data.')+'</span>';
+    });
   });
 }
 
@@ -945,33 +960,25 @@ function syncPush(){
   var url=getSyncUrl();
   setSyncBtnState(true);
   showSyncTag('Pushing…','#1a6fa8');
+  // Send each field separately — each fits in one JSONP GET call
   var payload=getSyncPayload();
-  var json=JSON.stringify(payload);
-  // Base64 encode + chunk into ~8KB pieces for Apps Script property storage
-  var b64=btoa(unescape(encodeURIComponent(json))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=/g,'.');
-  var chunkSize=8000;
-  var chunks=[];
-  for(var i=0;i<b64.length;i+=chunkSize)chunks.push(b64.substring(i,i+chunkSize));
-  var session=Date.now().toString(36);
-  var total=chunks.length;
-  var sent=0;
-  function sendChunk(idx){
-    if(idx>=total){
-      // All chunks sent — assemble
-      gasPost(url,{action:'assemble',session:session,total:total},function(d){
-        setSyncBtnState(false);
-        if(d.ok)showSyncTag('☁️ Pushed! '+new Date().toLocaleTimeString(),'#1a6fa8');
-        else showSyncTag('Push failed: '+(d.error||'error'),'var(--red)');
-      });
+  var fields=['policies','accounts','newBiz','rules'];
+  var idx=0;
+  function sendField(){
+    if(idx>=fields.length){
+      setSyncBtnState(false);
+      showSyncTag('☁️ Pushed! '+new Date().toLocaleTimeString(),'#1a6fa8');
       return;
     }
-    gasPost(url,{action:'chunk',session:session,idx:idx,data:chunks[idx]},function(d){
-      if(!d.ok){setSyncBtnState(false);showSyncTag('Push error: '+(d.error||'chunk failed'),'var(--red)');return;}
-      showSyncTag('Pushing… '+(idx+1)+'/'+total,'#1a6fa8');
-      sendChunk(idx+1);
+    var key=fields[idx];
+    var val=typeof payload[key]==='string'?payload[key]:JSON.stringify(payload[key]);
+    showSyncTag('Pushing… ('+(idx+1)+'/'+fields.length+')','#1a6fa8');
+    gasGet(url,{action:'saveField',field:key,data:val,syncedAt:payload.syncedAt},function(d){
+      if(!d.ok){setSyncBtnState(false);showSyncTag('Push error on '+key+': '+(d.error||'failed'),'var(--red)');return;}
+      idx++;sendField();
     });
   }
-  sendChunk(0);
+  sendField();
 }
 
 function syncPull(){
