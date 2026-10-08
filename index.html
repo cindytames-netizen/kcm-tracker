@@ -348,18 +348,13 @@ header{background:linear-gradient(135deg,var(--sky-dark),var(--green));padding:0
 
 <!-- Sync Config Modal -->
 <div class="modal-overlay hidden" id="syncOverlay" onclick="if(event.target===this)closeSyncConfig()">
-<div class="modal">
-  <div class="modal-header"><h2>☁️ Cloud Sync Setup</h2><p style="font-size:12px;color:var(--muted);margin-top:6px;">Both you and your teammate enter the same Bin ID and API Key so you share the same data.</p></div>
+<div class="modal" style="max-width:500px;">
+  <div class="modal-header"><h2>☁️ Cloud Sync Setup</h2><p style="font-size:12px;color:var(--muted);margin-top:6px;">Syncs via your Google Apps Script. Both you and your teammate use the same URL.</p></div>
   <div class="modal-body">
     <div class="field-group">
-      <label>JSONBin Bin ID</label>
-      <input id="syncBinId" placeholder="e.g. 64abc123def456..." style="font-family:monospace;font-size:12px;">
-      <p style="font-size:11px;color:var(--muted);margin-top:4px;">From <strong>jsonbin.io</strong> → Create a Bin → copy the Bin ID</p>
-    </div>
-    <div class="field-group">
-      <label>API Key (Master Key)</label>
-      <input id="syncApiKey" placeholder="$2a$10$..." type="password" style="font-family:monospace;font-size:12px;">
-      <p style="font-size:11px;color:var(--muted);margin-top:4px;">From jsonbin.io → Account → API Keys → Master Key</p>
+      <label>Google Apps Script URL</label>
+      <input id="syncBinId" placeholder="https://script.google.com/macros/s/..." style="font-family:monospace;font-size:11px;">
+      <p style="font-size:11px;color:var(--muted);margin-top:4px;">Pre-filled with your deployed script URL. Only change if you redeploy.</p>
     </div>
     <div id="syncStatus" style="font-size:12px;padding:8px 0;color:var(--muted);min-height:20px;"></div>
   </div>
@@ -887,21 +882,21 @@ function saveAll() {
   } catch(e){alert('Save failed: '+e.message);}
 }
 
-// ── Cloud Sync (JSONBin.io) ──────────────────────────────────────────────────
+// ── Cloud Sync (Google Apps Script) ─────────────────────────────────────────
 var SK_SYNC='kcm_sync_cfg';
+var GAS_URL='https://script.google.com/macros/s/AKfycbx6pgayZ4iYrgClU6x99x9Xs2BYNVSwm7L-OCi_VGLzt3J59AN5WpQh_nVJRSjfdbD7/exec';
 function getSyncCfg(){try{return JSON.parse(localStorage.getItem(SK_SYNC)||'{}');}catch(e){return {};}}
+function getSyncUrl(){var cfg=getSyncCfg();return cfg.url||GAS_URL;}
 function saveSyncConfig(){
-  var binId=document.getElementById('syncBinId').value.trim();
-  var apiKey=document.getElementById('syncApiKey').value.trim();
-  if(!binId||!apiKey){document.getElementById('syncStatus').innerHTML='<span style="color:var(--red)">Both fields are required.</span>';return;}
-  localStorage.setItem(SK_SYNC,JSON.stringify({binId:binId,apiKey:apiKey}));
+  var url=document.getElementById('syncBinId').value.trim();
+  if(!url){document.getElementById('syncStatus').innerHTML='<span style="color:var(--red)">Please enter the Apps Script URL.</span>';return;}
+  localStorage.setItem(SK_SYNC,JSON.stringify({url:url}));
   document.getElementById('syncStatus').innerHTML='<span style="color:var(--green-dark)">✔ Settings saved!</span>';
   setTimeout(closeSyncConfig,1000);
 }
 function openSyncConfig(){
   var cfg=getSyncCfg();
-  document.getElementById('syncBinId').value=cfg.binId||'';
-  document.getElementById('syncApiKey').value=cfg.apiKey||'';
+  document.getElementById('syncBinId').value=cfg.url||GAS_URL;
   document.getElementById('syncStatus').innerHTML='';
   document.getElementById('syncOverlay').classList.remove('hidden');
 }
@@ -911,76 +906,92 @@ function getSyncPayload(){
   var pd={};
   for(var i=0;i<policies.length;i++){var p=policies[i];pd[p.id]={premium:p.premium||'',boundCarrier:p.boundCarrier||'',boundPremium:p.boundPremium||'',docuSign:p.docuSign,submitted:p.submitted,epicBilled:p.epicBilled,certsLender:p.certsLender,binder:p.binder,policySent:p.policySent,quoteGL:p.quoteGL,quoteProp:p.quoteProp,quoteUmb:p.quoteUmb,quoteWC:p.quoteWC,quoteFlood:p.quoteFlood,quoteBond:p.quoteBond};}
   var ad={};var ns=Object.keys(accounts);
-  for(var i=0;i<ns.length;i++){var n=ns[i];ad[n]={status:accounts[n].status,boundCarrier:accounts[n].boundCarrier||'',boundPremium:accounts[n].boundPremium||'',boundDates:accounts[n].boundDates||[],followupLog:accounts[n].followupLog||[],notesLog:accounts[n].notesLog||[]};}
-  return {policies:pd,accounts:ad,newBiz:newBiz,rules:rules,syncedAt:new Date().toISOString()};
+  for(var i=0;i<ns.length;i++){var n=ns[i];ad[n]={status:accounts[n].status,boundCarrier:accounts[n].boundCarrier||'',boundPremium:accounts[n].boundPremium||'',boundDates:accounts[n].boundDates||[],dateStatuses:accounts[n].dateStatuses||{},followupLog:accounts[n].followupLog||[],notesLog:accounts[n].notesLog||[]};}
+  return {policies:pd,accounts:ad,newBiz:JSON.stringify(newBiz),rules:JSON.stringify(rules),syncedAt:new Date().toISOString()};
 }
 
 function showSyncTag(msg,color){
   var t=document.getElementById('syncTag');
   t.textContent=msg;t.style.color=color||'#1a6fa8';t.style.display='inline-block';
-  setTimeout(function(){t.style.display='none';},3000);
+  setTimeout(function(){t.style.display='none';},4000);
 }
 function setSyncBtnState(loading){
   document.getElementById('syncPushBtn').disabled=loading;
   document.getElementById('syncPullBtn').disabled=loading;
 }
 
+function gasGet(url,params,cb){
+  var qs=Object.keys(params).map(function(k){return encodeURIComponent(k)+'='+encodeURIComponent(params[k]);}).join('&');
+  fetch(url+'?'+qs).then(function(r){return r.json();}).then(cb).catch(function(e){cb({ok:false,error:e.message});});
+}
+function gasPost(url,data,cb){
+  fetch(url,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify(data)})
+    .then(function(r){return r.json();}).then(cb).catch(function(e){cb({ok:false,error:e.message});});
+}
+
 function testSyncConnection(){
-  var cfg=getSyncCfg();
-  var binId=document.getElementById('syncBinId').value.trim()||cfg.binId;
-  var apiKey=document.getElementById('syncApiKey').value.trim()||cfg.apiKey;
+  var url=document.getElementById('syncBinId').value.trim()||getSyncUrl();
   var el=document.getElementById('syncStatus');
-  if(!binId||!apiKey){el.innerHTML='<span style="color:var(--red)">Enter Bin ID and API Key first.</span>';return;}
   el.innerHTML='Testing…';
-  fetch('https://api.jsonbin.io/v3/b/'+binId+'/latest',{headers:{'X-Master-Key':apiKey}})
-    .then(function(r){return r.json();})
-    .then(function(d){
-      if(d.record)el.innerHTML='<span style="color:var(--green-dark)">✔ Connected! Last synced: '+(d.record.syncedAt?new Date(d.record.syncedAt).toLocaleString():'never')+'</span>';
-      else el.innerHTML='<span style="color:var(--red)">Connected but bin is empty — Push first to initialize.</span>';
-    })
-    .catch(function(e){el.innerHTML='<span style="color:var(--red)">❌ Failed: '+e.message+'</span>';});
+  gasGet(url,{action:'ping'},function(d){
+    if(d.ok)el.innerHTML='<span style="color:var(--green-dark)">✔ Connected to Google Apps Script!</span>';
+    else el.innerHTML='<span style="color:var(--red)">❌ Could not connect: '+(d.error||'unknown error')+'</span>';
+  });
 }
 
 function syncPush(){
-  var cfg=getSyncCfg();
-  if(!cfg.binId||!cfg.apiKey){openSyncConfig();document.getElementById('syncStatus').innerHTML='<span style="color:var(--red)">Set up your Bin ID and API Key first.</span>';return;}
+  var url=getSyncUrl();
   setSyncBtnState(true);
   showSyncTag('Pushing…','#1a6fa8');
-  fetch('https://api.jsonbin.io/v3/b/'+cfg.binId,{
-    method:'PUT',
-    headers:{'Content-Type':'application/json','X-Master-Key':cfg.apiKey,'X-Bin-Versioning':'false'},
-    body:JSON.stringify(getSyncPayload())
-  })
-  .then(function(r){return r.json();})
-  .then(function(d){
-    setSyncBtnState(false);
-    if(d.record){showSyncTag('☁️ Pushed! '+new Date().toLocaleTimeString(),'#1a6fa8');}
-    else{showSyncTag('Push failed','var(--red)');}
-  })
-  .catch(function(e){setSyncBtnState(false);showSyncTag('Push error: '+e.message,'var(--red)');});
+  var payload=getSyncPayload();
+  var json=JSON.stringify(payload);
+  // Base64 encode + chunk into ~8KB pieces for Apps Script property storage
+  var b64=btoa(unescape(encodeURIComponent(json))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=/g,'.');
+  var chunkSize=8000;
+  var chunks=[];
+  for(var i=0;i<b64.length;i+=chunkSize)chunks.push(b64.substring(i,i+chunkSize));
+  var session=Date.now().toString(36);
+  var total=chunks.length;
+  var sent=0;
+  function sendChunk(idx){
+    if(idx>=total){
+      // All chunks sent — assemble
+      gasPost(url,{action:'assemble',session:session,total:total},function(d){
+        setSyncBtnState(false);
+        if(d.ok)showSyncTag('☁️ Pushed! '+new Date().toLocaleTimeString(),'#1a6fa8');
+        else showSyncTag('Push failed: '+(d.error||'error'),'var(--red)');
+      });
+      return;
+    }
+    gasPost(url,{action:'chunk',session:session,idx:idx,data:chunks[idx]},function(d){
+      if(!d.ok){setSyncBtnState(false);showSyncTag('Push error: '+(d.error||'chunk failed'),'var(--red)');return;}
+      showSyncTag('Pushing… '+(idx+1)+'/'+total,'#1a6fa8');
+      sendChunk(idx+1);
+    });
+  }
+  sendChunk(0);
 }
 
 function syncPull(){
-  var cfg=getSyncCfg();
-  if(!cfg.binId||!cfg.apiKey){openSyncConfig();document.getElementById('syncStatus').innerHTML='<span style="color:var(--red)">Set up your Bin ID and API Key first.</span>';return;}
+  var url=getSyncUrl();
   setSyncBtnState(true);
   showSyncTag('Pulling…','#1a6fa8');
-  fetch('https://api.jsonbin.io/v3/b/'+cfg.binId+'/latest',{headers:{'X-Master-Key':cfg.apiKey}})
-  .then(function(r){return r.json();})
-  .then(function(d){
+  gasGet(url,{action:'load'},function(d){
     setSyncBtnState(false);
-    if(!d.record){showSyncTag('Nothing in cloud yet','var(--muted)');return;}
-    var rec=d.record;
-    // Merge policies
-    if(rec.policies){for(var i=0;i<policies.length;i++){var pd=rec.policies[policies[i].id];if(pd)Object.assign(policies[i],pd);}}
-    // Merge accounts
-    if(rec.accounts){var ns=Object.keys(rec.accounts);for(var i=0;i<ns.length;i++){var n=ns[i];if(accounts[n])Object.assign(accounts[n],{status:rec.accounts[n].status||'',boundCarrier:rec.accounts[n].boundCarrier||'',boundPremium:rec.accounts[n].boundPremium||'',boundDates:rec.accounts[n].boundDates||[],followupLog:rec.accounts[n].followupLog||[],notesLog:rec.accounts[n].notesLog||[]});}}
-    if(rec.newBiz)newBiz=rec.newBiz;
-    if(rec.rules)rules=rec.rules;
-    saveAll();populateFilters();updateStats();renderRenewals();renderActions();renderCompleted();renderCancelled();
-    showSyncTag('☁️ Pulled! '+new Date().toLocaleTimeString(),'#1a6fa8');
-  })
-  .catch(function(e){setSyncBtnState(false);showSyncTag('Pull error: '+e.message,'var(--red)');});
+    if(!d.ok){showSyncTag('Pull error: '+(d.error||'failed'),'var(--red)');return;}
+    var rec=d.data;
+    if(!rec||!rec.policies){showSyncTag('Nothing in cloud yet','var(--muted)');return;}
+    try{
+      var pd=typeof rec.policies==='string'?JSON.parse(rec.policies):rec.policies;
+      var ad=typeof rec.accounts==='string'?JSON.parse(rec.accounts):rec.accounts;
+      if(pd){for(var i=0;i<policies.length;i++){var ps=pd[policies[i].id];if(ps)Object.assign(policies[i],ps);}}
+      if(ad){var ns=Object.keys(ad);for(var i=0;i<ns.length;i++){var n=ns[i];if(accounts[n])Object.assign(accounts[n],{status:ad[n].status||'',boundCarrier:ad[n].boundCarrier||'',boundPremium:ad[n].boundPremium||'',boundDates:ad[n].boundDates||[],dateStatuses:ad[n].dateStatuses||{},followupLog:ad[n].followupLog||[],notesLog:ad[n].notesLog||[]});}}
+      if(rec.newBiz){try{newBiz=typeof rec.newBiz==='string'?JSON.parse(rec.newBiz):rec.newBiz;}catch(e){}}
+      if(rec.rules){try{rules=typeof rec.rules==='string'?JSON.parse(rec.rules):rec.rules;}catch(e){}}
+      saveAll();populateFilters();updateStats();renderRenewals();renderActions();renderCompleted();renderCancelled();
+      showSyncTag('☁️ Pulled! '+new Date().toLocaleTimeString(),'#1a6fa8');
+    }catch(e){showSyncTag('Pull parse error: '+e.message,'var(--red)');}
+  });
 }
 // ────────────────────────────────────────────────────────────────────────────
 
