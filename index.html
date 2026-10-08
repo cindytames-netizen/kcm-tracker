@@ -1484,6 +1484,8 @@ function renderCompleted() {
         boundLines+=bline;
       }
       var boundInfo=boundLines?'<div style="padding:2px 18px 10px;">'+boundLines+'</div>':'';
+      var bpremTotal=0;for(var m=0;m<pols.length;m++){var bpv=parseFloat((pols[m].boundPremium||pols[m].premium||'').toString().replace(/[$,]/g,''));if(!isNaN(bpv)&&bpv>0)bpremTotal+=bpv;}
+      var bprem=bpremTotal>0?'💲'+bpremTotal.toLocaleString('en-US',{minimumFractionDigits:0,maximumFractionDigits:0}):'';
       cards+='<div class="acard urg-green" style="border-left-color:var(--green)">'
         +'<div class="comp-banner"><span style="font-size:12px;font-weight:700;color:var(--green-dark)">✅ Bound & Complete</span></div>'
         +'<div class="acard-header"><div class="acard-name">'+a.name+'</div><div class="acard-meta"><span class="days-badge db-green">📅 '+ds+'</span><span class="policy-count">📋 '+pols.length+' polic'+(pols.length===1?'y':'ies')+'</span>'+(bprem?'<span class="pl-prem-total">'+bprem+'</span>':'')+'</div></div>'
