@@ -779,17 +779,27 @@ function isTruthy(v) {
   return s==='yes'||s==='y'||s==='1'||s==='x'||s==='true'||s==='sent'||s==='done'||s==='complete'||s==='submitted'||s==='received';
 }
 
-function allChecksComplete(a) {
-  if(!a.policies||!a.policies.length)return false;
+// Per-card (account + dateKey) completion check
+function cardChecksComplete(a,dateKey) {
+  // get policies belonging to this card's dateKey
+  var pols=[];
   for(var i=0;i<a.policies.length;i++){
-    var p=a.policies[i];
-    for(var j=0;j<CHK.length;j++){if(!isTruthy(p[CHK[j].k]))return false;}
+    var pd=a.policies[i].expDate&&!isNaN(a.policies[i].expDate)?a.policies[i].expDate.toDateString():'';
+    if(pd===dateKey)pols.push(a.policies[i]);
+  }
+  if(!pols.length)return false;
+  for(var i=0;i<pols.length;i++){
+    for(var j=0;j<CHK.length;j++){if(!isTruthy(pols[i][CHK[j].k]))return false;}
   }
   return true;
 }
-function isCompleted(a) { return (a.status||'').toLowerCase()==='bound' && allChecksComplete(a); }
+function isCardComplete(a,dateKey) {
+  return getCardStatus(a,dateKey)==='Bound' && cardChecksComplete(a,dateKey);
+}
+// Legacy account-level helpers (used for cancelled check and stats)
+function isCompleted(a) { return (a.status||'').toLowerCase()==='bound'; }
 function isCancelled(a) { return (a.status||'').toLowerCase()==='cancelled'; }
-function isActive(a) { return !isCompleted(a) && !isCancelled(a); }
+function isActive(a) { return !isCancelled(a); }
 function isDateBound(a,dateKey) { return a.boundDates&&a.boundDates.indexOf(dateKey)>=0; }
 
 function acctMinDays(a) {
@@ -854,7 +864,7 @@ function loadSaved() {
     if(rs) {
       var ed=JSON.parse(rs);
       if(ed.policies) { for(var i=0;i<policies.length;i++){var s=ed.policies[policies[i].id];if(s)Object.assign(policies[i],s);} }
-      if(ed.accounts) { var ns=Object.keys(ed.accounts); for(var i=0;i<ns.length;i++){var n=ns[i];if(accounts[n])Object.assign(accounts[n],{status:ed.accounts[n].status||'',boundCarrier:ed.accounts[n].boundCarrier||'',boundPremium:ed.accounts[n].boundPremium||'',boundDates:ed.accounts[n].boundDates||[],followupLog:ed.accounts[n].followupLog||[]});} }
+      if(ed.accounts) { var ns=Object.keys(ed.accounts); for(var i=0;i<ns.length;i++){var n=ns[i];if(accounts[n])Object.assign(accounts[n],{status:ed.accounts[n].status||'',boundCarrier:ed.accounts[n].boundCarrier||'',boundPremium:ed.accounts[n].boundPremium||'',boundDates:ed.accounts[n].boundDates||[],dateStatuses:ed.accounts[n].dateStatuses||{},followupLog:ed.accounts[n].followupLog||[]});} }
     }
     var nb=localStorage.getItem(SK_NB); if(nb)newBiz=JSON.parse(nb);
     var rl=localStorage.getItem(SK_RULES);
@@ -870,7 +880,7 @@ function saveAll() {
   try {
     var pd={};
     for(var i=0;i<policies.length;i++){var p=policies[i];pd[p.id]={premium:p.premium||'',docuSign:p.docuSign,submitted:p.submitted,epicBilled:p.epicBilled,certsLender:p.certsLender,binder:p.binder,policySent:p.policySent,quoteGL:p.quoteGL,quoteProp:p.quoteProp,quoteUmb:p.quoteUmb,quoteWC:p.quoteWC,quoteFlood:p.quoteFlood,quoteBond:p.quoteBond};}
-    var ad={};var ns=Object.keys(accounts);for(var i=0;i<ns.length;i++){var n=ns[i];ad[n]={status:accounts[n].status,boundCarrier:accounts[n].boundCarrier||'',boundPremium:accounts[n].boundPremium||'',boundDates:accounts[n].boundDates||[],followupLog:accounts[n].followupLog||[],notesLog:accounts[n].notesLog||[]};}
+    var ad={};var ns=Object.keys(accounts);for(var i=0;i<ns.length;i++){var n=ns[i];ad[n]={status:accounts[n].status,boundCarrier:accounts[n].boundCarrier||'',boundPremium:accounts[n].boundPremium||'',boundDates:accounts[n].boundDates||[],dateStatuses:accounts[n].dateStatuses||{},followupLog:accounts[n].followupLog||[],notesLog:accounts[n].notesLog||[]};}
     localStorage.setItem(SK,JSON.stringify({policies:pd,accounts:ad}));
     localStorage.setItem(SK_NB,JSON.stringify(newBiz));
     localStorage.setItem(SK_RULES,JSON.stringify(rules));
@@ -990,7 +1000,14 @@ function exportCSV() {
 function updateStats() {
   var al=Object.values(accounts);
   var active=[],comp=[],canc=[];
-  for(var i=0;i<al.length;i++){if(isActive(al[i]))active.push(al[i]);else if(isCompleted(al[i]))comp.push(al[i]);else if(isCancelled(al[i]))canc.push(al[i]);}
+  for(var i=0;i<al.length;i++){
+    if(isCancelled(al[i])){canc.push(al[i]);continue;}
+    // count completed cards per account
+    var byDate={};for(var j=0;j<al[i].policies.length;j++){var pd=al[i].policies[j].expDate&&!isNaN(al[i].policies[j].expDate)?al[i].policies[j].expDate.toDateString():'';if(!byDate[pd])byDate[pd]=[];byDate[pd].push(al[i].policies[j]);}
+    var dks=Object.keys(byDate);var hasActive=false;
+    for(var j=0;j<dks.length;j++){if(isCardComplete(al[i],dks[j]))comp.push(al[i]);else hasActive=true;}
+    if(hasActive)active.push(al[i]);
+  }
   var alerts=0;for(var i=0;i<al.length;i++)alerts+=fireRulesOnAccount(al[i]).length;
   var s30=0,s60=0,s60p=0,sOvr=0;
   for(var i=0;i<active.length;i++){var n=acctMinDays(active[i]);if(n===null)continue;if(n<0)sOvr++;else if(n<=30)s30++;else if(n<=60)s60++;else s60p++;}
@@ -1088,7 +1105,6 @@ function renderRenewals() {
   for(var i=0;i<al.length;i++){
     var a=al[i];
     if(isCancelled(a))continue;
-    if(isCompleted(a))continue;
     if(search&&a.name.toLowerCase().indexOf(search)<0)continue;
     if(adv&&a.advisor!==adv)continue;
     if(urg&&acctUrgClass(a)!==urg)continue;
@@ -1096,7 +1112,7 @@ function renderRenewals() {
     for(var j=0;j<a.policies.length;j++){
       var p=a.policies[j];
       var pdate=p.expDate&&!isNaN(p.expDate)?p.expDate.toDateString():'';
-      if(isDateBound(a,pdate))continue;
+      if(isCardComplete(a,pdate))continue;
       if(mf){
         if(!p.expDate||isNaN(p.expDate))continue;
         var pk=p.expDate.getFullYear()+'-'+pad(p.expDate.getMonth()+1);
@@ -1141,7 +1157,8 @@ function makeCard(a,visiblePols) {
   var cntLabel=vc<tc?'📋 '+vc+' of '+tc+' policies':'📋 '+vc+' polic'+(vc===1?'y':'ies');
   var sk=a.name.replace(/\W/g,'_');
   var sn=a.name.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
-  var st=a.status||'';
+  var cardDateKey=pols[0]&&pols[0].expDate&&!isNaN(pols[0].expDate)?pols[0].expDate.toDateString():'';
+  var st=(a.dateStatuses&&cardDateKey&&a.dateStatuses[cardDateKey])||(!cardDateKey?a.status:'')||'';
   var sopts=['','Active','In Progress','Pending','Proposed','Quoted','Bound','Cancelled','Non-Renewal','Rewrite'];
   var shtml='';for(var i=0;i<sopts.length;i++)shtml+='<option'+(st===sopts[i]?' selected':'')+'>'+(sopts[i]||'— Status —')+'</option>';
   var alertBanner='';
@@ -1235,8 +1252,9 @@ function togglePol(id,field,el,e) {
     if(pill){if(na.length)pill.textContent='⚠️ '+na.length;else pill.remove();}
     card.classList.toggle('has-alerts',na.length>0);
   }
-  // If account is Bound, check if all boxes are now done → move to Completed
-  if(acct&&isCompleted(acct)){
+  // Check if this policy's card is now fully complete → re-render
+  var pdate=p.expDate&&!isNaN(p.expDate)?p.expDate.toDateString():'';
+  if(acct&&isCardComplete(acct,pdate)){
     updateStats();renderActions();renderRenewals();renderCompleted();saveAll();return;
   }
   updateStats();renderActions();saveAll();
@@ -1264,11 +1282,19 @@ function setPremium(id,val) {
 }
 
 var _boundPending={name:null,sel:null,prev:null,dateKey:null};
+function getCardStatus(a,dateKey){
+  if(a.dateStatuses&&dateKey&&a.dateStatuses[dateKey]!==undefined)return a.dateStatuses[dateKey];
+  return a.status||'';
+}
+function setCardStatus(a,dateKey,val){
+  if(dateKey){if(!a.dateStatuses)a.dateStatuses={};a.dateStatuses[dateKey]=val;}
+  else a.status=val;
+}
 function setAcctStatus(name,sel,e,dateKey) {
   if(e)e.stopPropagation();
   var a=accounts[name];if(!a)return;
   if(sel.value==='Rewrite'){openRewrite(name,sel);return;}
-  var prev=a.status||'';
+  var prev=getCardStatus(a,dateKey);
   if(sel.value==='Bound'){
     _boundPending={name:name,sel:sel,prev:prev,dateKey:dateKey||null};
     document.getElementById('boundAcctName').textContent=name+(dateKey?' — '+dateKey:'');
@@ -1280,11 +1306,11 @@ function setAcctStatus(name,sel,e,dateKey) {
   }
   if(sel.value==='Cancelled'){
     if(!confirm('Mark "'+name+'" as CANCELLED?\nThis will remove it from the Renewals board.')){sel.value=prev;return;}
+    a.status='Cancelled';
+    updateStats();renderActions();renderRenewals();renderCancelled();saveAll();return;
   }
-  a.status=sel.value;
-  updateStats();renderActions();renderRenewals();
-  if(isCompleted(a))renderCompleted();
-  if(isCancelled(a))renderCancelled();
+  setCardStatus(a,dateKey,sel.value);
+  updateStats();renderActions();renderRenewals();saveAll();
 }
 function closeBoundModal(){
   document.getElementById('boundOverlay').classList.add('hidden');
@@ -1301,9 +1327,10 @@ function confirmBound(){
   if(dk){
     if(!a.boundDates)a.boundDates=[];
     if(a.boundDates.indexOf(dk)<0)a.boundDates.push(dk);
+    setCardStatus(a,dk,'Bound');
+  } else {
+    a.status='Bound';
   }
-  // Mark status as Bound (account stays on renewals board until all checkboxes are checked)
-  a.status='Bound';
   document.getElementById('boundOverlay').classList.add('hidden');
   _boundPending={name:null,sel:null,prev:null,dateKey:null};
   updateStats();renderActions();renderRenewals();renderCompleted();
@@ -1366,28 +1393,49 @@ function renderCompleted() {
   var adv=document.getElementById('compAdvisor').value;
   var advSel=document.getElementById('compAdvisor');
   if(advSel.options.length===1){var seen={},advs=[];for(var i=0;i<policies.length;i++){var a2=policies[i].advisor;if(!seen[a2]){seen[a2]=true;advs.push(a2);}}advs.sort();for(var i=0;i<advs.length;i++){var o=document.createElement('option');o.value=advs[i];o.textContent=advs[i];advSel.appendChild(o);}}
-  var al=Object.values(accounts);var filtered=[];
-  for(var i=0;i<al.length;i++){var a=al[i];if(!isCompleted(a))continue;if(search&&a.name.toLowerCase().indexOf(search)<0)continue;if(adv&&a.advisor!==adv)continue;filtered.push(a);}
+  // Collect completed cards (account + dateKey pairs)
+  var al=Object.values(accounts);var completedCards=[];
+  for(var i=0;i<al.length;i++){
+    var a=al[i];if(isCancelled(a))continue;
+    if(search&&a.name.toLowerCase().indexOf(search)<0)continue;
+    if(adv&&a.advisor!==adv)continue;
+    // group policies by dateKey
+    var byDate={};
+    for(var j=0;j<a.policies.length;j++){
+      var p=a.policies[j];
+      var dk=p.expDate&&!isNaN(p.expDate)?p.expDate.toDateString():'';
+      if(!byDate[dk])byDate[dk]=[];
+      byDate[dk].push(p);
+    }
+    var dks=Object.keys(byDate);
+    for(var j=0;j<dks.length;j++){
+      var dk=dks[j];
+      if(isCardComplete(a,dk))completedCards.push({acct:a,pols:byDate[dk],dateKey:dk});
+    }
+  }
   var kb=document.getElementById('kanban-completed');
-  if(!filtered.length){kb.innerHTML='<div class="empty-state"><div class="icon">✅</div><h3>No completed accounts yet</h3><p>Set status to <strong>Bound</strong> to complete</p></div>';return;}
-  var groups={};for(var i=0;i<filtered.length;i++){var k=filtered[i].advisor||'Unassigned';if(!groups[k])groups[k]=[];groups[k].push(filtered[i]);}
+  if(!completedCards.length){kb.innerHTML='<div class="empty-state"><div class="icon">✅</div><h3>No completed cards yet</h3><p>Mark as <strong>Bound</strong> and check all boxes to complete a card</p></div>';return;}
+  // group by advisor
+  var groups={};
+  for(var i=0;i<completedCards.length;i++){var k=completedCards[i].acct.advisor||'Unassigned';if(!groups[k])groups[k]=[];groups[k].push(completedCards[i]);}
   var gk=Object.keys(groups).sort();var html='';
   for(var i=0;i<gk.length;i++){
     var k=gk[i];var items=groups[k];var cards='';
     for(var j=0;j<items.length;j++){
-      var a=items[j];
-      var dates=[];for(var m=0;m<a.policies.length;m++){if(a.policies[m].expDate&&!isNaN(a.policies[m].expDate))dates.push(a.policies[m].expDate);}
+      var entry=items[j];var a=entry.acct;var pols=entry.pols;var dk=entry.dateKey;
+      var dates=[];for(var m=0;m<pols.length;m++){if(pols[m].expDate&&!isNaN(pols[m].expDate))dates.push(pols[m].expDate);}
       dates.sort(function(x,y){return x-y;});
       var ds=dates.length?dates[0].toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}):'—';
-      var sk=a.name.replace(/\W/g,'_');var sn=a.name.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+      var sn=a.name.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+      var dkEsc=dk.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
       var bcarrier=a.boundCarrier?'🏢 '+a.boundCarrier:'';
       var bprem=a.boundPremium?'💲 '+a.boundPremium:'';
       var boundInfo=(bcarrier||bprem)?'<div style="font-size:11px;color:var(--green-dark);padding:2px 18px 10px;font-weight:600;">'+(bcarrier?bcarrier:'')+(bcarrier&&bprem?' · ':'')+bprem+'</div>':'';
       cards+='<div class="acard urg-green" style="border-left-color:var(--green)">'
         +'<div class="comp-banner"><span style="font-size:12px;font-weight:700;color:var(--green-dark)">✅ Bound & Complete</span></div>'
-        +'<div class="acard-header"><div class="acard-name">'+a.name+'</div><div class="acard-meta"><span class="days-badge db-green">📅 '+ds+'</span><span class="policy-count">📋 '+a.policies.length+' polic'+(a.policies.length===1?'y':'ies')+'</span>'+(bprem?'<span class="pl-prem-total">'+bprem+'</span>':'')+'</div></div>'
+        +'<div class="acard-header"><div class="acard-name">'+a.name+'</div><div class="acard-meta"><span class="days-badge db-green">📅 '+ds+'</span><span class="policy-count">📋 '+pols.length+' polic'+(pols.length===1?'y':'ies')+'</span>'+(bprem?'<span class="pl-prem-total">'+bprem+'</span>':'')+'</div></div>'
         +boundInfo
-        +'<div class="acard-advisor"><div class="advisor-tag" style="padding:0 18px 12px">👤 <span>'+a.advisor+'</span></div><div style="padding:0 18px 12px"><button class="followup-btn" style="background:#fdeaea;color:var(--red)" onclick="undoComplete(\''+sn+'\')">↩ Move Back</button></div></div>'
+        +'<div class="acard-advisor"><div class="advisor-tag" style="padding:0 18px 12px">👤 <span>'+a.advisor+'</span></div><div style="padding:0 18px 12px"><button class="followup-btn" style="background:#fdeaea;color:var(--red)" onclick="undoComplete(\''+sn+'\',\''+dkEsc+'\')">↩ Move Back</button></div></div>'
         +'</div>';
     }
     html+='<div class="col"><div class="col-header"><h3>'+k+'</h3><span class="col-count">'+items.length+'</span></div><div class="col-body">'+cards+'</div></div>';
@@ -1395,7 +1443,14 @@ function renderCompleted() {
   kb.innerHTML=html;
 }
 
-function undoComplete(name){var a=accounts[name];if(!a)return;a.status='';updateStats();renderCompleted();renderRenewals();}
+function undoComplete(name,dateKey){
+  var a=accounts[name];if(!a)return;
+  // Reset the card's status back to empty
+  setCardStatus(a,dateKey,'');
+  // Also clear from boundDates so it shows on renewals again
+  if(dateKey&&a.boundDates){var idx=a.boundDates.indexOf(dateKey);if(idx>=0)a.boundDates.splice(idx,1);}
+  updateStats();renderCompleted();renderRenewals();saveAll();
+}
 
 function renderCancelled() {
   var search=document.getElementById('cancSearch').value.toLowerCase();
@@ -1566,7 +1621,7 @@ function handleFile(e){
       for(var ci=0;ci<hm[key].length;ci++){for(var hi=0;hi<headers.length;hi++){if(headers[hi].toLowerCase().trim().replace(/\s+/g,' ')===hm[key][ci]){cols[key]=hi;break;}}if(cols[key]>=0)break;}
     }
     var savedE={};for(var i=0;i<policies.length;i++){var p=policies[i];savedE[p.accountName+'||'+p.description]={premium:p.premium||'',docuSign:p.docuSign,submitted:p.submitted,epicBilled:p.epicBilled,certsLender:p.certsLender,binder:p.binder,policySent:p.policySent,quoteGL:p.quoteGL,quoteProp:p.quoteProp,quoteUmb:p.quoteUmb,quoteWC:p.quoteWC,quoteFlood:p.quoteFlood,quoteBond:p.quoteBond};}
-    var savedA={};var ans=Object.keys(accounts);for(var i=0;i<ans.length;i++)savedA[ans[i]]={status:accounts[ans[i]].status,boundCarrier:accounts[ans[i]].boundCarrier||'',boundPremium:accounts[ans[i]].boundPremium||'',boundDates:accounts[ans[i]].boundDates||[],followupLog:accounts[ans[i]].followupLog||[],notesLog:accounts[ans[i]].notesLog||[]};
+    var savedA={};var ans=Object.keys(accounts);for(var i=0;i<ans.length;i++)savedA[ans[i]]={status:accounts[ans[i]].status,boundCarrier:accounts[ans[i]].boundCarrier||'',boundPremium:accounts[ans[i]].boundPremium||'',boundDates:accounts[ans[i]].boundDates||[],dateStatuses:accounts[ans[i]].dateStatuses||{},followupLog:accounts[ans[i]].followupLog||[],notesLog:accounts[ans[i]].notesLog||[]};
     var newRAW=[];
     for(var i=hr+1;i<raw.length;i++){
       var row=raw[i];var hasVal=false;for(var j=0;j<row.length;j++){if(row[j]!==''){hasVal=true;break;}}if(!hasVal)continue;
@@ -1583,7 +1638,7 @@ function handleFile(e){
     RAW.length=0;var mv=Object.values(mm);for(var i=0;i<mv.length;i++)RAW.push(mv[i]);
     buildData();
     for(var i=0;i<policies.length;i++){var se=savedE[policies[i].accountName+'||'+policies[i].description];if(se)Object.assign(policies[i],se);}
-    var rns=Object.keys(accounts);for(var i=0;i<rns.length;i++){var sa=savedA[rns[i]];if(sa)Object.assign(accounts[rns[i]],{status:sa.status||'',boundCarrier:sa.boundCarrier||'',boundPremium:sa.boundPremium||'',boundDates:sa.boundDates||[],followupLog:sa.followupLog||[],notesLog:sa.notesLog||[]});}
+    var rns=Object.keys(accounts);for(var i=0;i<rns.length;i++){var sa=savedA[rns[i]];if(sa)Object.assign(accounts[rns[i]],{status:sa.status||'',boundCarrier:sa.boundCarrier||'',boundPremium:sa.boundPremium||'',boundDates:sa.boundDates||[],dateStatuses:sa.dateStatuses||{},followupLog:sa.followupLog||[],notesLog:sa.notesLog||[]});}
     saveAll();populateFilters();updateStats();renderRenewals();renderActions();
     var an=Object.keys(accounts);document.getElementById('headerSub').textContent=an.length+' accounts · '+policies.length+' policies · uploaded '+new Date().toLocaleDateString();
     document.getElementById('tb-renewals').textContent=an.length;
