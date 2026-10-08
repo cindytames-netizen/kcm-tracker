@@ -1134,6 +1134,7 @@ function renderRenewals() {
   var html='';
   for(var i=0;i<keys.length;i++){
     var k=keys[i];var entries=groups[k];
+    entries.sort(function(a,b){var da=a.pols[0].expDate;var db=b.pols[0].expDate;return(da&&!isNaN(da)?da:new Date(9999,0))-(db&&!isNaN(db)?db:new Date(9999,0));});
     var cards='';
     for(var j=0;j<entries.length;j++)cards+=makeCard(entries[j].acct,entries[j].pols);
     html+='<div class="col"><div class="col-header"><h3>'+k+'</h3><span class="col-count">'+entries.length+'</span></div><div class="col-body">'+cards+'</div></div>';
