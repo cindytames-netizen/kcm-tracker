@@ -960,23 +960,53 @@ function syncPush(){
   var url=getSyncUrl();
   setSyncBtnState(true);
   showSyncTag('Pushing…','#1a6fa8');
-  // Send each field separately — each fits in one JSONP GET call
   var payload=getSyncPayload();
   var fields=['policies','accounts','newBiz','rules'];
-  var idx=0;
+  var fieldIdx=0;
+  // Max safe URL length for JSONP script tag (~6500 chars after all overhead)
+  var URL_LIMIT=6000;
+
   function sendField(){
-    if(idx>=fields.length){
+    if(fieldIdx>=fields.length){
       setSyncBtnState(false);
       showSyncTag('☁️ Pushed! '+new Date().toLocaleTimeString(),'#1a6fa8');
       return;
     }
-    var key=fields[idx];
+    var key=fields[fieldIdx];
     var val=typeof payload[key]==='string'?payload[key]:JSON.stringify(payload[key]);
-    showSyncTag('Pushing… ('+(idx+1)+'/'+fields.length+')','#1a6fa8');
-    gasGet(url,{action:'saveField',field:key,data:val,syncedAt:payload.syncedAt},function(d){
-      if(!d.ok){setSyncBtnState(false);showSyncTag('Push error on '+key+': '+(d.error||'failed'),'var(--red)');return;}
-      idx++;sendField();
-    });
+    showSyncTag('Pushing '+key+'…','#1a6fa8');
+
+    // Check if value fits in a single call
+    var testQs=url+'?action=saveField&field='+encodeURIComponent(key)+'&syncedAt='+encodeURIComponent(payload.syncedAt||'')+'&data='+encodeURIComponent(val);
+    if(testQs.length<=URL_LIMIT){
+      gasGet(url,{action:'saveField',field:key,data:val,syncedAt:payload.syncedAt||''},function(d){
+        if(!d.ok){setSyncBtnState(false);showSyncTag('Push error on '+key+': '+(d.error||'failed'),'var(--red)');return;}
+        fieldIdx++;sendField();
+      });
+    } else {
+      // Too large — chunk this field
+      var session=Date.now().toString(36)+'_'+key;
+      var chunkSize=4000;
+      var chunks=[];
+      for(var i=0;i<val.length;i+=chunkSize)chunks.push(val.substring(i,i+chunkSize));
+      var total=chunks.length;
+      var ci=0;
+      function sendChunk(){
+        if(ci>=total){
+          gasGet(url,{action:'assembleField',field:key,session:session,total:total,syncedAt:payload.syncedAt||''},function(d){
+            if(!d.ok){setSyncBtnState(false);showSyncTag('Push assemble error on '+key+': '+(d.error||'failed'),'var(--red)');return;}
+            fieldIdx++;sendField();
+          });
+          return;
+        }
+        showSyncTag('Pushing '+key+' '+(ci+1)+'/'+total+'…','#1a6fa8');
+        gasGet(url,{action:'chunkField',session:session,idx:ci,data:chunks[ci]},function(d){
+          if(!d.ok){setSyncBtnState(false);showSyncTag('Push chunk error: '+(d.error||'failed'),'var(--red)');return;}
+          ci++;sendChunk();
+        });
+      }
+      sendChunk();
+    }
   }
   sendField();
 }
