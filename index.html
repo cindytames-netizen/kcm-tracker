@@ -863,13 +863,27 @@ function fireRulesOnAccount(acct) {
   return all;
 }
 
+// Repair any account that has account-level status='Bound' AND per-card dateStatuses
+// That combination was created by an old bug — the account-level Bound hides remaining cards
+function repairAccountStatuses() {
+  var ns=Object.keys(accounts);
+  for(var i=0;i<ns.length;i++){
+    var a=accounts[ns[i]];
+    if(!a)continue;
+    // If account-level status is 'Bound' but there are per-card dateStatuses, clear account-level status
+    if((a.status||'').toLowerCase()==='bound' && a.dateStatuses && Object.keys(a.dateStatuses).length>0){
+      a.status='';
+    }
+  }
+}
+
 function loadSaved() {
   try {
     var rs=localStorage.getItem(SK);
     if(rs) {
       var ed=JSON.parse(rs);
       if(ed.policies) { for(var i=0;i<policies.length;i++){var s=ed.policies[policies[i].id];if(s)Object.assign(policies[i],s);} }
-      if(ed.accounts) { var ns=Object.keys(ed.accounts); for(var i=0;i<ns.length;i++){var n=ns[i];if(accounts[n])Object.assign(accounts[n],{status:ed.accounts[n].status||'',boundCarrier:ed.accounts[n].boundCarrier||'',boundPremium:ed.accounts[n].boundPremium||'',boundDates:ed.accounts[n].boundDates||[],dateStatuses:ed.accounts[n].dateStatuses||{},followupLog:ed.accounts[n].followupLog||[]});} }
+      if(ed.accounts) { var ns=Object.keys(ed.accounts); for(var i=0;i<ns.length;i++){var n=ns[i];if(accounts[n]){var lsSt=ed.accounts[n].status||'';var lsDs=ed.accounts[n].dateStatuses||{};if(lsSt.toLowerCase()==='bound'&&Object.keys(lsDs).length>0)lsSt='';Object.assign(accounts[n],{status:lsSt,boundCarrier:ed.accounts[n].boundCarrier||'',boundPremium:ed.accounts[n].boundPremium||'',boundDates:ed.accounts[n].boundDates||[],dateStatuses:lsDs,followupLog:ed.accounts[n].followupLog||[]});}} }
     }
     var nb=localStorage.getItem(SK_NB); if(nb)newBiz=JSON.parse(nb);
     var rl=localStorage.getItem(SK_RULES);
@@ -1033,10 +1047,10 @@ function syncPull(){
       var pd=typeof rec.policies==='string'?JSON.parse(rec.policies):rec.policies;
       var ad=typeof rec.accounts==='string'?JSON.parse(rec.accounts):rec.accounts;
       if(pd){for(var i=0;i<policies.length;i++){var ps=pd[policies[i].id];if(ps)Object.assign(policies[i],ps);}}
-      if(ad){var ns=Object.keys(ad);for(var i=0;i<ns.length;i++){var n=ns[i];if(accounts[n])Object.assign(accounts[n],{status:ad[n].status||'',boundCarrier:ad[n].boundCarrier||'',boundPremium:ad[n].boundPremium||'',boundDates:ad[n].boundDates||[],dateStatuses:ad[n].dateStatuses||{},followupLog:ad[n].followupLog||[],notesLog:ad[n].notesLog||[]});}}
+      if(ad){var ns=Object.keys(ad);for(var i=0;i<ns.length;i++){var n=ns[i];if(accounts[n]){var acctSt=ad[n].status||'';var acctDs=ad[n].dateStatuses||{};if(acctSt.toLowerCase()==='bound'&&Object.keys(acctDs).length>0)acctSt='';Object.assign(accounts[n],{status:acctSt,boundCarrier:ad[n].boundCarrier||'',boundPremium:ad[n].boundPremium||'',boundDates:ad[n].boundDates||[],dateStatuses:acctDs,followupLog:ad[n].followupLog||[],notesLog:ad[n].notesLog||[]});}}}
       if(rec.newBiz){try{newBiz=typeof rec.newBiz==='string'?JSON.parse(rec.newBiz):rec.newBiz;}catch(e){}}
       if(rec.rules){try{rules=typeof rec.rules==='string'?JSON.parse(rec.rules):rec.rules;}catch(e){}}
-      saveAll();populateFilters();updateStats();renderRenewals();renderActions();renderCompleted();renderCancelled();
+      repairAccountStatuses();saveAll();populateFilters();updateStats();renderRenewals();renderActions();renderCompleted();renderCancelled();
       showSyncTag('☁️ Pulled! '+new Date().toLocaleTimeString(),'#1a6fa8');
     }catch(e){showSyncTag('Pull parse error: '+e.message,'var(--red)');}
   });
@@ -1342,7 +1356,12 @@ function setPremium(id,val) {
 
 var _boundPending={name:null,sel:null,prev:null,dateKey:null};
 function getCardStatus(a,dateKey){
+  // Per-card status takes priority
   if(a.dateStatuses&&dateKey&&a.dateStatuses[dateKey]!==undefined)return a.dateStatuses[dateKey];
+  // Only fall back to account-level status if there are NO per-card statuses at all
+  // (i.e. this is an old account that predates per-card tracking)
+  // If per-card statuses exist, a missing dateKey just means "not yet set" = ''
+  if(a.dateStatuses&&Object.keys(a.dateStatuses).length>0)return '';
   return a.status||'';
 }
 function setCardStatus(a,dateKey,val){
@@ -1745,8 +1764,14 @@ function handleFile(e){
     RAW.length=0;var mv=Object.values(mm);for(var i=0;i<mv.length;i++)RAW.push(mv[i]);
     buildData();
     for(var i=0;i<policies.length;i++){var se=savedE[policies[i].accountName+'||'+policies[i].description];if(se)Object.assign(policies[i],se);}
-    var rns=Object.keys(accounts);for(var i=0;i<rns.length;i++){var sa=savedA[rns[i]];if(sa)Object.assign(accounts[rns[i]],{status:sa.status||'',boundCarrier:sa.boundCarrier||'',boundPremium:sa.boundPremium||'',boundDates:sa.boundDates||[],dateStatuses:sa.dateStatuses||{},followupLog:sa.followupLog||[],notesLog:sa.notesLog||[]});}
-    saveAll();populateFilters();updateStats();renderRenewals();renderActions();
+    var rns=Object.keys(accounts);for(var i=0;i<rns.length;i++){var sa=savedA[rns[i]];if(sa){
+      // If account-level status is 'Bound' but we have per-card dateStatuses, clear the
+      // account-level status — it was set by an old bug and should not hide remaining cards
+      var acctStatus=sa.status||'';
+      if(acctStatus.toLowerCase()==='bound'&&sa.dateStatuses&&Object.keys(sa.dateStatuses).length>0)acctStatus='';
+      Object.assign(accounts[rns[i]],{status:acctStatus,boundCarrier:sa.boundCarrier||'',boundPremium:sa.boundPremium||'',boundDates:sa.boundDates||[],dateStatuses:sa.dateStatuses||{},followupLog:sa.followupLog||[],notesLog:sa.notesLog||[]});
+    }}
+    repairAccountStatuses();saveAll();populateFilters();updateStats();renderRenewals();renderActions();
     var an=Object.keys(accounts);document.getElementById('headerSub').textContent=an.length+' accounts · '+policies.length+' policies · uploaded '+new Date().toLocaleDateString();
     document.getElementById('tb-renewals').textContent=an.length;
   };
@@ -1755,7 +1780,7 @@ function handleFile(e){
 }
 
 function init(){
-  buildData();loadSaved();populateFilters();updateStats();
+  buildData();loadSaved();repairAccountStatuses();populateFilters();updateStats();
   renderRenewals();renderNewBiz();renderRules();renderActions();
   var an=Object.keys(accounts);
   document.getElementById('headerSub').textContent=an.length+' accounts · '+policies.length+' policies · '+today.toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'});
@@ -1774,10 +1799,10 @@ function autoSyncPull(){
       var pd=typeof rec.policies==='string'?JSON.parse(rec.policies):rec.policies;
       var ad=typeof rec.accounts==='string'?JSON.parse(rec.accounts):rec.accounts;
       if(pd){for(var i=0;i<policies.length;i++){var ps=pd[policies[i].id];if(ps)Object.assign(policies[i],ps);}}
-      if(ad){var ns=Object.keys(ad);for(var i=0;i<ns.length;i++){var n=ns[i];if(accounts[n])Object.assign(accounts[n],{status:ad[n].status||'',boundCarrier:ad[n].boundCarrier||'',boundPremium:ad[n].boundPremium||'',boundDates:ad[n].boundDates||[],dateStatuses:ad[n].dateStatuses||{},followupLog:ad[n].followupLog||[],notesLog:ad[n].notesLog||[]});}}
+      if(ad){var ns=Object.keys(ad);for(var i=0;i<ns.length;i++){var n=ns[i];if(accounts[n]){var acctSt2=ad[n].status||'';var acctDs2=ad[n].dateStatuses||{};if(acctSt2.toLowerCase()==='bound'&&Object.keys(acctDs2).length>0)acctSt2='';Object.assign(accounts[n],{status:acctSt2,boundCarrier:ad[n].boundCarrier||'',boundPremium:ad[n].boundPremium||'',boundDates:ad[n].boundDates||[],dateStatuses:acctDs2,followupLog:ad[n].followupLog||[],notesLog:ad[n].notesLog||[]});}}}
       if(rec.newBiz){try{newBiz=typeof rec.newBiz==='string'?JSON.parse(rec.newBiz):rec.newBiz;}catch(e){}}
       if(rec.rules){try{rules=typeof rec.rules==='string'?JSON.parse(rec.rules):rec.rules;}catch(e){}}
-      saveAll();populateFilters();updateStats();renderRenewals();renderActions();renderCompleted();renderCancelled();
+      repairAccountStatuses();saveAll();populateFilters();updateStats();renderRenewals();renderActions();renderCompleted();renderCancelled();
       showSyncTag('☁️ Synced','#1a6fa8');
     }catch(e){console.warn('Auto-sync pull failed:',e);}
   });
