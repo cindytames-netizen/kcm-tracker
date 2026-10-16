@@ -801,7 +801,11 @@ function isCompleted(a) {
   for(var i=0;i<dks.length;i++){if(!isCardComplete(a,dks[i]))return false;}
   return true;
 }
-function isCancelled(a) { return (a.status||'').toLowerCase()==='cancelled'; }
+function isCancelled(a) {
+  // Account-level cancelled only if set directly with no per-card statuses (old single-card accounts)
+  if((!a.dateStatuses||Object.keys(a.dateStatuses).length===0)&&(a.status||'').toLowerCase()==='cancelled')return true;
+  return false;
+}
 function isActive(a) { return !isCancelled(a); }
 function isDateBound(a,dateKey) { return a.boundDates&&a.boundDates.indexOf(dateKey)>=0; }
 
@@ -875,15 +879,21 @@ function fireRulesOnAccount(acct) {
   return all;
 }
 
-// Repair any account that has account-level status='Bound' AND per-card dateStatuses
-// That combination was created by an old bug — the account-level Bound hides remaining cards
+// Repair accounts where account-level status was set by the old bug.
+// The old code set a.status='Bound' or a.status='Cancelled' on the whole account
+// when only one date card was bound/cancelled. This hides all remaining cards.
+// Fix: if the account has per-card dateStatuses, the account-level status should be '' —
+// each card manages its own status independently.
 function repairAccountStatuses() {
   var ns=Object.keys(accounts);
   for(var i=0;i<ns.length;i++){
     var a=accounts[ns[i]];
     if(!a)continue;
-    // If account-level status is 'Bound' but there are per-card dateStatuses, clear account-level status
-    if((a.status||'').toLowerCase()==='bound' && a.dateStatuses && Object.keys(a.dateStatuses).length>0){
+    var st=(a.status||'').toLowerCase();
+    var hasPerCardStatuses=a.dateStatuses&&Object.keys(a.dateStatuses).length>0;
+    // If account-level status is Bound or Cancelled BUT there are per-card statuses,
+    // the account-level status was set by the old bug — clear it
+    if((st==='bound'||st==='cancelled')&&hasPerCardStatuses){
       a.status='';
     }
   }
@@ -1415,7 +1425,8 @@ function setAcctStatus(name,sel,e,dateKey) {
   }
   if(sel.value==='Cancelled'){
     if(!confirm('Mark "'+name+'" as CANCELLED?\nThis will remove it from the Renewals board.')){sel.value=prev;return;}
-    a.status='Cancelled';
+    // Set per-card only — never account-level, so other date cards aren't affected
+    setCardStatus(a,dateKey,'Cancelled');
     updateStats();renderActions();renderRenewals();renderCancelled();saveAll();return;
   }
   setCardStatus(a,dateKey,sel.value);
