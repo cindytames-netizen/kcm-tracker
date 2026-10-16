@@ -905,7 +905,7 @@ function loadSaved() {
     if(rs) {
       var ed=JSON.parse(rs);
       if(ed.policies) { for(var i=0;i<policies.length;i++){var s=ed.policies[policies[i].id];if(s)Object.assign(policies[i],s);} }
-      if(ed.accounts) { var ns=Object.keys(ed.accounts); for(var i=0;i<ns.length;i++){var n=ns[i];if(accounts[n]){var lsSt=ed.accounts[n].status||'';var lsDs=ed.accounts[n].dateStatuses||{};if(lsSt.toLowerCase()==='bound'&&Object.keys(lsDs).length>0)lsSt='';Object.assign(accounts[n],{status:lsSt,boundCarrier:ed.accounts[n].boundCarrier||'',boundPremium:ed.accounts[n].boundPremium||'',boundDates:ed.accounts[n].boundDates||[],dateStatuses:lsDs,followupLog:ed.accounts[n].followupLog||[]});}} }
+      if(ed.accounts) { var ns=Object.keys(ed.accounts); for(var i=0;i<ns.length;i++){var n=ns[i];if(accounts[n]){var lsSt=ed.accounts[n].status||'';var lsDs=ed.accounts[n].dateStatuses||{};if(lsSt.toLowerCase()==='bound'&&Object.keys(lsDs).length>0)lsSt='';Object.assign(accounts[n],{status:lsSt,boundCarrier:ed.accounts[n].boundCarrier||'',boundPremium:ed.accounts[n].boundPremium||'',boundDates:ed.accounts[n].boundDates||[],dateStatuses:lsDs,followupLog:ed.accounts[n].followupLog||[],dateNotes:ed.accounts[n].dateNotes||{}});}} }
     }
     var nb=localStorage.getItem(SK_NB); if(nb)newBiz=JSON.parse(nb);
     var rl=localStorage.getItem(SK_RULES);
@@ -921,7 +921,7 @@ function saveAll() {
   try {
     var pd={};
     for(var i=0;i<policies.length;i++){var p=policies[i];pd[p.id]={premium:p.premium||'',boundCarrier:p.boundCarrier||'',boundPremium:p.boundPremium||'',docuSign:p.docuSign,submitted:p.submitted,epicBilled:p.epicBilled,certsLender:p.certsLender,binder:p.binder,policySent:p.policySent,quoteGL:p.quoteGL,quoteProp:p.quoteProp,quoteUmb:p.quoteUmb,quoteWC:p.quoteWC,quoteFlood:p.quoteFlood,quoteBond:p.quoteBond};}
-    var ad={};var ns=Object.keys(accounts);for(var i=0;i<ns.length;i++){var n=ns[i];ad[n]={status:accounts[n].status,boundCarrier:accounts[n].boundCarrier||'',boundPremium:accounts[n].boundPremium||'',boundDates:accounts[n].boundDates||[],dateStatuses:accounts[n].dateStatuses||{},followupLog:accounts[n].followupLog||[],notesLog:accounts[n].notesLog||[]};}
+    var ad={};var ns=Object.keys(accounts);for(var i=0;i<ns.length;i++){var n=ns[i];ad[n]={status:accounts[n].status,boundCarrier:accounts[n].boundCarrier||'',boundPremium:accounts[n].boundPremium||'',boundDates:accounts[n].boundDates||[],dateStatuses:accounts[n].dateStatuses||{},followupLog:accounts[n].followupLog||[],dateNotes:accounts[n].dateNotes||{}};}
     localStorage.setItem(SK,JSON.stringify({policies:pd,accounts:ad}));
     localStorage.setItem(SK_NB,JSON.stringify(newBiz));
     localStorage.setItem(SK_RULES,JSON.stringify(rules));
@@ -953,7 +953,7 @@ function getSyncPayload(){
   var pd={};
   for(var i=0;i<policies.length;i++){var p=policies[i];pd[p.id]={premium:p.premium||'',boundCarrier:p.boundCarrier||'',boundPremium:p.boundPremium||'',docuSign:p.docuSign,submitted:p.submitted,epicBilled:p.epicBilled,certsLender:p.certsLender,binder:p.binder,policySent:p.policySent,quoteGL:p.quoteGL,quoteProp:p.quoteProp,quoteUmb:p.quoteUmb,quoteWC:p.quoteWC,quoteFlood:p.quoteFlood,quoteBond:p.quoteBond};}
   var ad={};var ns=Object.keys(accounts);
-  for(var i=0;i<ns.length;i++){var n=ns[i];ad[n]={status:accounts[n].status,boundCarrier:accounts[n].boundCarrier||'',boundPremium:accounts[n].boundPremium||'',boundDates:accounts[n].boundDates||[],dateStatuses:accounts[n].dateStatuses||{},followupLog:accounts[n].followupLog||[],notesLog:accounts[n].notesLog||[]};}
+  for(var i=0;i<ns.length;i++){var n=ns[i];ad[n]={status:accounts[n].status,boundCarrier:accounts[n].boundCarrier||'',boundPremium:accounts[n].boundPremium||'',boundDates:accounts[n].boundDates||[],dateStatuses:accounts[n].dateStatuses||{},followupLog:accounts[n].followupLog||[],dateNotes:accounts[n].dateNotes||{}};}
   return {policies:pd,accounts:ad,newBiz:JSON.stringify(newBiz),rules:JSON.stringify(rules),syncedAt:new Date().toISOString()};
 }
 
@@ -1069,7 +1069,7 @@ function syncPull(){
       var pd=typeof rec.policies==='string'?JSON.parse(rec.policies):rec.policies;
       var ad=typeof rec.accounts==='string'?JSON.parse(rec.accounts):rec.accounts;
       if(pd){for(var i=0;i<policies.length;i++){var ps=pd[policies[i].id];if(ps)Object.assign(policies[i],ps);}}
-      if(ad){var ns=Object.keys(ad);for(var i=0;i<ns.length;i++){var n=ns[i];if(accounts[n]){var acctSt=ad[n].status||'';var acctDs=ad[n].dateStatuses||{};if(acctSt.toLowerCase()==='bound'&&Object.keys(acctDs).length>0)acctSt='';Object.assign(accounts[n],{status:acctSt,boundCarrier:ad[n].boundCarrier||'',boundPremium:ad[n].boundPremium||'',boundDates:ad[n].boundDates||[],dateStatuses:acctDs,followupLog:ad[n].followupLog||[],notesLog:ad[n].notesLog||[]});}}}
+      if(ad){var ns=Object.keys(ad);for(var i=0;i<ns.length;i++){var n=ns[i];if(accounts[n]){var acctSt=ad[n].status||'';var acctDs=ad[n].dateStatuses||{};if(acctSt.toLowerCase()==='bound'&&Object.keys(acctDs).length>0)acctSt='';Object.assign(accounts[n],{status:acctSt,boundCarrier:ad[n].boundCarrier||'',boundPremium:ad[n].boundPremium||'',boundDates:ad[n].boundDates||[],dateStatuses:acctDs,followupLog:ad[n].followupLog||[],dateNotes:ad[n].dateNotes||{}});}}}
       if(rec.newBiz){try{newBiz=typeof rec.newBiz==='string'?JSON.parse(rec.newBiz):rec.newBiz;}catch(e){}}
       if(rec.rules){try{rules=typeof rec.rules==='string'?JSON.parse(rec.rules):rec.rules;}catch(e){}}
       repairAccountStatuses();saveAll();populateFilters();updateStats();renderRenewals();renderActions();renderCompleted();renderCancelled();
@@ -1281,15 +1281,17 @@ function makeCard(a,visiblePols) {
   }
   var premTotalBadge=totalPrem>0?'<span class="pl-prem-total">💲'+totalPrem.toLocaleString('en-US',{minimumFractionDigits:0,maximumFractionDigits:0})+'</span>':'';
   if(!a.followupLog)a.followupLog=[];
-  if(!a.notesLog)a.notesLog=[];
+  if(!a.dateNotes)a.dateNotes={};
   var fl=a.followupLog;
-  var nl=a.notesLog;
+  // Notes are per date-card only — use dateNotes[cardDateKey], not the old account-level notesLog
+  var nl=a.dateNotes[cardDateKey]||[];
+  var dkEsc=cardDateKey.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
   var flItems='';
   for(var i=0;i<fl.length;i++)flItems+='<div class="fl-item"><span class="fl-date">'+fl[i].date+'</span><span>'+fl[i].note+'</span><button class="fl-del" onclick="delFL(\''+sn+'\','+i+',event)">✕</button></div>';
   var flPanel='<div class="acard-followup-panel" id="fl-'+sk+'">'+flItems+'<div class="add-fl-row"><input id="fl-inp-'+sk+'" placeholder="Log follow-up..." onclick="event.stopPropagation()"><button class="add-fl-btn" onclick="addFL(\''+sn+'\',event)">Log</button></div></div>';
   var nlItems='';
-  for(var i=0;i<nl.length;i++)nlItems+='<div class="fl-item"><span class="fl-date">'+nl[i].date+'</span><span>'+nl[i].text+'</span><button class="fl-del" onclick="delNote(\''+sn+'\','+i+',event)">✕</button></div>';
-  var nlPanel='<div class="acard-followup-panel" id="nl-'+sk+'">'+nlItems+'<div class="add-fl-row"><input id="nl-inp-'+sk+'" placeholder="Add a note..." onclick="event.stopPropagation()"><button class="add-fl-btn" style="background:var(--sky)" onclick="addNote(\''+sn+'\',event)">Add</button></div></div>';
+  for(var i=0;i<nl.length;i++)nlItems+='<div class="fl-item"><span class="fl-date">'+nl[i].date+'</span><span>'+nl[i].text+'</span><button class="fl-del" onclick="delNote(\''+sn+'\',\''+dkEsc+'\','+i+',event)">✕</button></div>';
+  var nlPanel='<div class="acard-followup-panel" id="nl-'+sk+'">'+nlItems+'<div class="add-fl-row"><input id="nl-inp-'+sk+'" placeholder="Add a note..." onclick="event.stopPropagation()"><button class="add-fl-btn" style="background:var(--sky)" onclick="addNote(\''+sn+'\',\''+dkEsc+'\',event)">Add</button></div></div>';
   return '<div class="acard '+urgC+(alerts.length?' has-alerts':'')+'" id="acard-'+sk+'">'
     +'<div class="acard-header">'
       +'<div class="acard-name">'+a.name+'</div>'
@@ -1492,6 +1494,25 @@ function delFL(name,idx,e) {
   e.stopPropagation();
   var a=accounts[name];if(!a||!a.followupLog)return;
   a.followupLog.splice(idx,1);renderRenewals();
+}
+
+function addNote(name,dateKey,e) {
+  e.stopPropagation();
+  var a=accounts[name];if(!a)return;
+  var sk=(name+'_'+dateKey).replace(/\W/g,'_');
+  var inp=document.getElementById('nl-inp-'+sk);
+  var text=inp?inp.value.trim():'';if(!text)return;
+  if(!a.dateNotes)a.dateNotes={};
+  if(!a.dateNotes[dateKey])a.dateNotes[dateKey]=[];
+  a.dateNotes[dateKey].unshift({date:new Date().toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}),text:text});
+  saveAll();renderRenewals();
+}
+
+function delNote(name,dateKey,idx,e) {
+  e.stopPropagation();
+  var a=accounts[name];if(!a||!a.dateNotes||!a.dateNotes[dateKey])return;
+  a.dateNotes[dateKey].splice(idx,1);
+  saveAll();renderRenewals();
 }
 
 function renderActions() {
@@ -1770,7 +1791,7 @@ function handleFile(e){
       for(var ci=0;ci<hm[key].length;ci++){for(var hi=0;hi<headers.length;hi++){if(headers[hi].toLowerCase().trim().replace(/\s+/g,' ')===hm[key][ci]){cols[key]=hi;break;}}if(cols[key]>=0)break;}
     }
     var savedE={};for(var i=0;i<policies.length;i++){var p=policies[i];savedE[p.accountName+'||'+p.description]={premium:p.premium||'',docuSign:p.docuSign,submitted:p.submitted,epicBilled:p.epicBilled,certsLender:p.certsLender,binder:p.binder,policySent:p.policySent,quoteGL:p.quoteGL,quoteProp:p.quoteProp,quoteUmb:p.quoteUmb,quoteWC:p.quoteWC,quoteFlood:p.quoteFlood,quoteBond:p.quoteBond};}
-    var savedA={};var ans=Object.keys(accounts);for(var i=0;i<ans.length;i++)savedA[ans[i]]={status:accounts[ans[i]].status,boundCarrier:accounts[ans[i]].boundCarrier||'',boundPremium:accounts[ans[i]].boundPremium||'',boundDates:accounts[ans[i]].boundDates||[],dateStatuses:accounts[ans[i]].dateStatuses||{},followupLog:accounts[ans[i]].followupLog||[],notesLog:accounts[ans[i]].notesLog||[]};
+    var savedA={};var ans=Object.keys(accounts);for(var i=0;i<ans.length;i++)savedA[ans[i]]={status:accounts[ans[i]].status,boundCarrier:accounts[ans[i]].boundCarrier||'',boundPremium:accounts[ans[i]].boundPremium||'',boundDates:accounts[ans[i]].boundDates||[],dateStatuses:accounts[ans[i]].dateStatuses||{},followupLog:accounts[ans[i]].followupLog||[],dateNotes:accounts[ans[i]].dateNotes||{}};
     var newRAW=[];
     for(var i=hr+1;i<raw.length;i++){
       var row=raw[i];var hasVal=false;for(var j=0;j<row.length;j++){if(row[j]!==''){hasVal=true;break;}}if(!hasVal)continue;
@@ -1792,7 +1813,7 @@ function handleFile(e){
       // account-level status — it was set by an old bug and should not hide remaining cards
       var acctStatus=sa.status||'';
       if(acctStatus.toLowerCase()==='bound'&&sa.dateStatuses&&Object.keys(sa.dateStatuses).length>0)acctStatus='';
-      Object.assign(accounts[rns[i]],{status:acctStatus,boundCarrier:sa.boundCarrier||'',boundPremium:sa.boundPremium||'',boundDates:sa.boundDates||[],dateStatuses:sa.dateStatuses||{},followupLog:sa.followupLog||[],notesLog:sa.notesLog||[]});
+      Object.assign(accounts[rns[i]],{status:acctStatus,boundCarrier:sa.boundCarrier||'',boundPremium:sa.boundPremium||'',boundDates:sa.boundDates||[],dateStatuses:sa.dateStatuses||{},followupLog:sa.followupLog||[],dateNotes:sa.dateNotes||{}});
     }}
     repairAccountStatuses();saveAll();populateFilters();updateStats();renderRenewals();renderActions();
     var an=Object.keys(accounts);document.getElementById('headerSub').textContent=an.length+' accounts · '+policies.length+' policies · uploaded '+new Date().toLocaleDateString();
@@ -1848,7 +1869,7 @@ function autoSyncPull(){
       var pd=typeof rec.policies==='string'?JSON.parse(rec.policies):rec.policies;
       var ad=typeof rec.accounts==='string'?JSON.parse(rec.accounts):rec.accounts;
       if(pd){for(var i=0;i<policies.length;i++){var ps=pd[policies[i].id];if(ps)Object.assign(policies[i],ps);}}
-      if(ad){var ns=Object.keys(ad);for(var i=0;i<ns.length;i++){var n=ns[i];if(accounts[n]){var acctSt2=ad[n].status||'';var acctDs2=ad[n].dateStatuses||{};if(acctSt2.toLowerCase()==='bound'&&Object.keys(acctDs2).length>0)acctSt2='';Object.assign(accounts[n],{status:acctSt2,boundCarrier:ad[n].boundCarrier||'',boundPremium:ad[n].boundPremium||'',boundDates:ad[n].boundDates||[],dateStatuses:acctDs2,followupLog:ad[n].followupLog||[],notesLog:ad[n].notesLog||[]});}}}
+      if(ad){var ns=Object.keys(ad);for(var i=0;i<ns.length;i++){var n=ns[i];if(accounts[n]){var acctSt2=ad[n].status||'';var acctDs2=ad[n].dateStatuses||{};if(acctSt2.toLowerCase()==='bound'&&Object.keys(acctDs2).length>0)acctSt2='';Object.assign(accounts[n],{status:acctSt2,boundCarrier:ad[n].boundCarrier||'',boundPremium:ad[n].boundPremium||'',boundDates:ad[n].boundDates||[],dateStatuses:acctDs2,followupLog:ad[n].followupLog||[],dateNotes:ad[n].dateNotes||{}});}}}
       if(rec.newBiz){try{newBiz=typeof rec.newBiz==='string'?JSON.parse(rec.newBiz):rec.newBiz;}catch(e){}}
       if(rec.rules){try{rules=typeof rec.rules==='string'?JSON.parse(rec.rules):rec.rules;}catch(e){}}
       repairAccountStatuses();saveAll();populateFilters();updateStats();renderRenewals();renderActions();renderCompleted();renderCancelled();
