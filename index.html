@@ -790,8 +790,16 @@ function cardChecksComplete(a,dateKey) {
 function isCardComplete(a,dateKey) {
   return getCardStatus(a,dateKey)==='Bound' && cardChecksComplete(a,dateKey);
 }
-// Legacy account-level helpers (used for cancelled check and stats)
-function isCompleted(a) { return (a.status||'').toLowerCase()==='bound'; }
+// Account-level helpers
+function isCompleted(a) {
+  // An account is fully complete only if EVERY date card is complete
+  if(!a.policies||!a.policies.length)return false;
+  var byDate={};
+  for(var i=0;i<a.policies.length;i++){var p=a.policies[i];var dk=p.expDate&&!isNaN(p.expDate)?p.expDate.toDateString():'';if(!byDate[dk])byDate[dk]=true;}
+  var dks=Object.keys(byDate);
+  for(var i=0;i<dks.length;i++){if(!isCardComplete(a,dks[i]))return false;}
+  return true;
+}
 function isCancelled(a) { return (a.status||'').toLowerCase()==='cancelled'; }
 function isActive(a) { return !isCancelled(a); }
 function isDateBound(a,dateKey) { return a.boundDates&&a.boundDates.indexOf(dateKey)>=0; }
@@ -819,7 +827,8 @@ function isRelevantQuote(desc,field) {
 }
 
 function checkToddRule(pol,acct) {
-  if(isCompleted(acct))return false;
+  var pdate=pol.expDate&&!isNaN(pol.expDate)?pol.expDate.toDateString():'';
+  if(isCardComplete(acct,pdate))return false;
   var adv=(pol.advisor||acct.advisor||'').trim().toLowerCase();
   var desc=(pol.description||'').toLowerCase();
   var carrier=(pol.issuingCompany||'').trim().toLowerCase();
@@ -828,7 +837,7 @@ function checkToddRule(pol,acct) {
 }
 
 function fireRulesOnPolicy(pol,acct) {
-  if(isCompleted(acct))return[];
+  // Never suppress rules based on account-level status — check per-card only
   var pdate=pol.expDate&&!isNaN(pol.expDate)?pol.expDate.toDateString():'';
   if(isCardComplete(acct,pdate))return[];
   var alerts=[];
@@ -1407,14 +1416,18 @@ function confirmBound(){
   var firstCarrier='',firstPremium='';
   for(var ci=0;ci<inputs.length;ci++){var inp=inputs[ci];if(inp.getAttribute('data-field')==='carrier'&&!firstCarrier)firstCarrier=inp.value.trim();if(inp.getAttribute('data-field')==='premium'&&!firstPremium)firstPremium=inp.value.trim();}
   a.boundCarrier=firstCarrier;a.boundPremium=firstPremium;
-  // Track which date group was bound
+  // Track which date group was bound (always per-card, never account-level)
   var dk=_boundPending.dateKey;
+  if(!a.boundDates)a.boundDates=[];
   if(dk){
-    if(!a.boundDates)a.boundDates=[];
     if(a.boundDates.indexOf(dk)<0)a.boundDates.push(dk);
     setCardStatus(a,dk,'Bound');
   } else {
-    a.status='Bound';
+    // No dateKey — find the first unbounded card and bind it
+    var byDate={};
+    for(var pi=0;pi<a.policies.length;pi++){var p2=a.policies[pi];var dk2=p2.expDate&&!isNaN(p2.expDate)?p2.expDate.toDateString():'';if(!byDate[dk2])byDate[dk2]=[];byDate[dk2].push(p2);}
+    var dks2=Object.keys(byDate);
+    if(dks2.length>0){dk=dks2[0];if(a.boundDates.indexOf(dk)<0)a.boundDates.push(dk);setCardStatus(a,dk,'Bound');}
   }
   document.getElementById('boundOverlay').classList.add('hidden');
   _boundPending={name:null,sel:null,prev:null,dateKey:null};
