@@ -166,6 +166,7 @@ header{background:linear-gradient(135deg,var(--sky-dark),var(--green));padding:0
     <button class="hbtn" id="syncPullBtn" onclick="syncPull()" title="Pull latest from cloud">☁️ Pull</button>
     <button class="hbtn" id="syncPushBtn" onclick="syncPush()" title="Push your data to cloud">⬆️ Push</button>
     <button class="hbtn" onclick="openSyncConfig()" title="Cloud sync settings" style="padding:8px 10px;">⚙️</button>
+    <button class="hbtn" onclick="debugAccount()" title="Debug account state" style="padding:8px 10px;background:#fff3cd;color:#856404;">🔍 Debug</button>
     <span class="saved-tag" id="savedTag">✔ Saved!</span>
     <span class="saved-tag" id="syncTag" style="background:rgba(255,255,255,0.9);color:#1a6fa8;display:none;"></span>
   </div>
@@ -840,6 +841,11 @@ function fireRulesOnPolicy(pol,acct) {
   // Never suppress rules based on account-level status — check per-card only
   var pdate=pol.expDate&&!isNaN(pol.expDate)?pol.expDate.toDateString():'';
   if(isCardComplete(acct,pdate))return[];
+  // Get the card's current status dropdown value
+  var cardSt=(getCardStatus(acct,pdate)||'').toLowerCase();
+  // Statuses that mean work is underway — suppress "not yet submitted" type escalations
+  var workingStatuses=['in progress','submitted','quoted','proposed','bound','non-renewal','rewrite'];
+  var isWorking=workingStatuses.indexOf(cardSt)>=0;
   var alerts=[];
   if(checkToddRule(pol,acct)) alerts.push({msg:'Submit property quote to RISKTHE-01',severity:'warn',polId:pol.id,desc:pol.description});
   for(var i=0;i<rules.length;i++) {
@@ -847,6 +853,12 @@ function fireRulesOnPolicy(pol,acct) {
     if(!r.on)continue;
     if(r.daysCond==='lte'&&(pol.daysUntil===null||pol.daysUntil>r.daysVal))continue;
     if(r.daysCond==='gte'&&(pol.daysUntil===null||pol.daysUntil<r.daysVal))continue;
+    // Suppress "not yet submitted" escalation if card status shows work is underway
+    if(r.op==='notChecked'&&r.field==='submitted'&&isWorking)continue;
+    // Suppress "policy not sent" alert if card is not yet Bound (policy can't be sent before binding)
+    // and suppress it once policySent checkbox is checked (handled below via isTruthy)
+    // But if card status is NOT Bound, "Follow up — send policy" isn't actionable yet — skip it
+    if(r.op==='notChecked'&&r.field==='policySent'&&cardSt!=='bound')continue;
     var fv=(pol[r.field]||'').toString().toLowerCase();
     var match=false;
     if(r.op==='contains'&&fv.indexOf((r.val||'').toLowerCase())>=0)match=true;
@@ -1777,6 +1789,32 @@ function handleFile(e){
   };
   if(isCSV)reader.readAsText(file);else reader.readAsBinaryString(file);
   e.target.value='';
+}
+
+function debugAccount(){
+  var name=prompt('Enter account name to debug (or leave blank for Leuven Group):','Leuven Group');
+  if(!name)return;
+  var a=accounts[name];
+  if(!a){alert('Account "'+name+'" not found in memory.\n\nAll account names:\n'+Object.keys(accounts).sort().join('\n'));return;}
+  var lines=['ACCOUNT: '+a.name,'status: "'+a.status+'"','boundDates: '+JSON.stringify(a.boundDates||[]),'','dateStatuses:'];
+  var ds=a.dateStatuses||{};
+  var dks=Object.keys(ds);
+  if(dks.length===0)lines.push('  (none)');
+  for(var i=0;i<dks.length;i++)lines.push('  '+dks[i]+' → "'+ds[dks[i]]+'"');
+  lines.push('','POLICIES ('+a.policies.length+'):');
+  for(var i=0;i<a.policies.length;i++){
+    var p=a.policies[i];
+    var dk=p.expDate&&!isNaN(p.expDate)?p.expDate.toDateString():'';
+    var cardSt=getCardStatus(a,dk);
+    var chks=[];
+    var CHK2=[{k:'docuSign'},{k:'submitted'},{k:'epicBilled'},{k:'certsLender'},{k:'binder'},{k:'policySent'}];
+    for(var j=0;j<CHK2.length;j++)if(isTruthy(p[CHK2[j].k]))chks.push(CHK2[j].k);
+    var complete=isCardComplete(a,dk);
+    lines.push('  ['+i+'] '+p.description);
+    lines.push('       expDate: '+dk+' | cardStatus: "'+cardSt+'" | isCardComplete: '+complete);
+    lines.push('       checked: '+(chks.length?chks.join(', '):'none'));
+  }
+  alert(lines.join('\n'));
 }
 
 function init(){
