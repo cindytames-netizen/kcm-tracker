@@ -973,7 +973,7 @@ function gasCall(url,params,cb){
   var timer=setTimeout(function(){
     window[cbName]=null;if(s&&s.parentNode)s.parentNode.removeChild(s);
     cb({ok:false,error:'Timeout — check your Apps Script deployment'});
-  },30000);
+  },60000);
   window[cbName]=function(d){
     clearTimeout(timer);window[cbName]=null;if(s&&s.parentNode)s.parentNode.removeChild(s);cb(d);
   };
@@ -1012,9 +1012,9 @@ function syncPush(){
   var fieldIdx=0;
   // Safe URL limit for JSONP script tag GET requests
   var GET_LIMIT=6000;
-  // Raw JSON chars per chunk. encodeURIComponent worst-case triples each char.
-  // 2000 raw × 3 = 6000 encoded, plus ~300 for base URL/params = ~6300 total. Safe.
-  var CHUNK_B64=2000;
+  // Raw JSON chars per chunk. Typical JSON expands ~1.5x with encodeURIComponent.
+  // 5000 raw × 1.5 = 7500 encoded + ~300 base URL = ~7800. Google allows ~8000. Safe.
+  var CHUNK_B64=5000;
 
   function sendField(){
     if(fieldIdx>=fields.length){
@@ -1054,7 +1054,7 @@ function syncPush(){
         showSyncTag('Pushing '+key+' '+(ci+1)+'/'+total+'…','#1a6fa8');
         gasGet(url,{action:'chunkField',session:session,idx:String(ci),data:chunks[ci]},function(d){
           if(!d.ok){setSyncBtnState(false);showSyncTag('Push error on '+key+' chunk '+(ci+1)+': '+(d.error||'failed'),'var(--red)');return;}
-          ci++;sendChunk();
+          ci++;setTimeout(sendChunk,200);
         });
       }
       sendChunk();
