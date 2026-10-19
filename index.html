@@ -985,16 +985,8 @@ function gasCall(url,params,cb){
 }
 function gasGet(url,params,cb){gasCall(url,params,cb);}
 
-// POST via fetch — no URL length limit, used for large field values
-function gasPost(url,params,cb){
-  var body=new URLSearchParams();
-  var keys=Object.keys(params);
-  for(var i=0;i<keys.length;i++)body.append(keys[i],params[keys[i]]);
-  fetch(url,{method:'POST',body:body})
-    .then(function(r){return r.json();})
-    .then(function(d){cb(d);})
-    .catch(function(e){cb({ok:false,error:'POST failed: '+e.message});});
-}
+// gasPost kept as alias for gasGet (CORS blocks real POST to Apps Script)
+function gasPost(url,params,cb){gasGet(url,params,cb);}
 
 function testSyncConnection(){
   var url=document.getElementById('syncBinId').value.trim()||getSyncUrl();
@@ -1018,8 +1010,11 @@ function syncPush(){
   var payload=getSyncPayload();
   var fields=['policies','accounts','newBiz','rules'];
   var fieldIdx=0;
-  // If a GET URL with this field fits under this limit, use JSONP GET; otherwise use POST
-  var GET_LIMIT=2000;
+  // Safe URL limit for JSONP script tag GET requests
+  // base64 grows ~33% so 5000 raw chars → ~6700 encoded, well under browser limits
+  var GET_LIMIT=6000;
+  // Raw chars per chunk before base64 encoding (~4500 raw → ~6000 base64)
+  var CHUNK_RAW=4500;
 
   function sendField(){
     if(fieldIdx>=fields.length){
@@ -1031,19 +1026,38 @@ function syncPush(){
     var val=typeof payload[key]==='string'?payload[key]:JSON.stringify(payload[key]);
     showSyncTag('Pushing '+key+'…','#1a6fa8');
 
+    // Try direct saveField GET first (small fields)
     var testQs=url+'?action=saveField&field='+encodeURIComponent(key)+'&syncedAt='+encodeURIComponent(payload.syncedAt||'')+'&data='+encodeURIComponent(val);
-    var params={action:'saveField',field:key,data:val,syncedAt:payload.syncedAt||''};
     var done=function(d){
       if(!d.ok){setSyncBtnState(false);showSyncTag('Push error on '+key+': '+(d.error||'failed'),'var(--red)');return;}
       fieldIdx++;sendField();
     };
 
     if(testQs.length<=GET_LIMIT){
-      // Small enough for JSONP GET
-      gasGet(url,params,done);
+      gasGet(url,{action:'saveField',field:key,data:val,syncedAt:payload.syncedAt||''},done);
     } else {
-      // Too large for GET URL — use fetch POST (no size limit)
-      gasPost(url,params,done);
+      // Large field — base64-encode and chunk (base64 only grows ~33%, safe for URLs)
+      var b64=btoa(unescape(encodeURIComponent(val)));
+      var session=Date.now().toString(36)+'_'+key;
+      var chunks=[];
+      for(var i=0;i<b64.length;i+=CHUNK_RAW)chunks.push(b64.substring(i,i+CHUNK_RAW));
+      var total=chunks.length;
+      var ci=0;
+      function sendChunk(){
+        if(ci>=total){
+          gasGet(url,{action:'assembleFieldB64',field:key,session:session,total:String(total),syncedAt:payload.syncedAt||''},function(d){
+            if(!d.ok){setSyncBtnState(false);showSyncTag('Push error on '+key+': '+(d.error||'failed'),'var(--red)');return;}
+            fieldIdx++;sendField();
+          });
+          return;
+        }
+        showSyncTag('Pushing '+key+' '+(ci+1)+'/'+total+'…','#1a6fa8');
+        gasGet(url,{action:'chunkField',session:session,idx:String(ci),data:chunks[ci]},function(d){
+          if(!d.ok){setSyncBtnState(false);showSyncTag('Push error on '+key+' chunk '+(ci+1)+': '+(d.error||'failed'),'var(--red)');return;}
+          ci++;sendChunk();
+        });
+      }
+      sendChunk();
     }
   }
   sendField();
