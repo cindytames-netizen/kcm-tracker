@@ -1258,7 +1258,7 @@ function saveAll() {
     var pd={};
     for(var i=0;i<policies.length;i++){var p=policies[i];pd[p.id]={premium:p.premium||'',boundCarrier:p.boundCarrier||'',boundPremium:p.boundPremium||'',docuSign:p.docuSign,submitted:p.submitted,epicBilled:p.epicBilled,certsLender:p.certsLender,binder:p.binder,policySent:p.policySent,quoteGL:p.quoteGL,quoteProp:p.quoteProp,quoteUmb:p.quoteUmb,quoteWC:p.quoteWC,quoteFlood:p.quoteFlood,quoteBond:p.quoteBond};}
     var ad={};var ns=Object.keys(accounts);for(var i=0;i<ns.length;i++){var n=ns[i];ad[n]={status:accounts[n].status,boundCarrier:accounts[n].boundCarrier||'',boundPremium:accounts[n].boundPremium||'',boundDates:accounts[n].boundDates||[],dateStatuses:accounts[n].dateStatuses||{},followupLog:accounts[n].followupLog||[],dateNotes:accounts[n].dateNotes||{}};}
-    localStorage.setItem(SK,JSON.stringify({policies:pd,accounts:ad}));
+    localStorage.setItem(SK,JSON.stringify({policies:pd,accounts:ad,savedAt:new Date().toISOString()}));
     localStorage.setItem(SK_NB,JSON.stringify(newBiz));
     localStorage.setItem(SK_RULES,JSON.stringify(rules));
     var t=document.getElementById('savedTag');t.style.display='inline-block';setTimeout(function(){t.style.display='none';},2500);
@@ -1363,6 +1363,8 @@ function doPush(){
     if(fieldIdx>=fields.length){
       setSyncBtnState(false);
       showSyncTag('☁️ Pushed! '+new Date().toLocaleTimeString(),'#1a6fa8');
+      // Record push time so auto-pull knows local is current
+      try{var ls=localStorage.getItem(SK);var lsp=ls?JSON.parse(ls):{};lsp.savedAt=payload.syncedAt||new Date().toISOString();localStorage.setItem(SK,JSON.stringify(lsp));}catch(e){}
       return;
     }
     var key=fields[fieldIdx];
@@ -2314,9 +2316,17 @@ function autoSyncPull(){
     if(!d.ok||!d.data||!d.data.policies)return;
     var rec=d.data;
     try{
+      // Only apply cloud data if it's newer than what's saved locally
+      var localSaved=null;
+      try{var ls=localStorage.getItem(SK);if(ls)localSaved=JSON.parse(ls).savedAt||null;}catch(e){}
+      var cloudSaved=rec.syncedAt||null;
+      if(localSaved&&cloudSaved&&new Date(localSaved)>=new Date(cloudSaved)){
+        showSyncTag('☁️ Local is current','#1a6fa8');
+        return;
+      }
       applyCloudData(rec);
       repairAccountStatuses();saveAll();populateFilters();updateStats();renderRenewals();renderActions();renderCompleted();renderCancelled();
-      showSyncTag('☁️ Synced','#1a6fa8');
+      showSyncTag('☁️ Synced from cloud','#1a6fa8');
     }catch(e){console.warn('Auto-sync pull failed:',e);}
   });
 }
