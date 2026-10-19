@@ -2299,6 +2299,12 @@ function init(){
   document.getElementById('tb-renewals').textContent=an.length;
   // Auto-pull from cloud on load to ensure latest data is always shown
   autoSyncPull();
+  // Auto-push every 10 minutes
+  setInterval(function(){
+    var url=getSyncUrl();
+    if(!url)return;
+    syncPush();
+  }, 10*60*1000);
 }
 
 function autoSyncPull(){
