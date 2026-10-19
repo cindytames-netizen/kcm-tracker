@@ -1011,10 +1011,11 @@ function syncPush(){
   var fields=['policies','accounts','newBiz','rules'];
   var fieldIdx=0;
   // Safe URL limit for JSONP script tag GET requests
-  // base64 grows ~33% so 5000 raw chars → ~6700 encoded, well under browser limits
   var GET_LIMIT=6000;
-  // Raw chars per chunk before base64 encoding (~4500 raw → ~6000 base64)
-  var CHUNK_RAW=4500;
+  // base64 chars per chunk — base64 uses A-Z a-z 0-9 + / =
+  // encodeURIComponent turns + → %2B, / → %2F, = → %3D (triples those chars)
+  // Worst case ~50% of base64 chars are +/= → chunk of 800 base64 → ~1200 encoded → safe
+  var CHUNK_B64=800;
 
   function sendField(){
     if(fieldIdx>=fields.length){
@@ -1036,11 +1037,11 @@ function syncPush(){
     if(testQs.length<=GET_LIMIT){
       gasGet(url,{action:'saveField',field:key,data:val,syncedAt:payload.syncedAt||''},done);
     } else {
-      // Large field — base64-encode and chunk (base64 only grows ~33%, safe for URLs)
+      // Large field — base64-encode and chunk into small pieces safe for URL encoding
       var b64=btoa(unescape(encodeURIComponent(val)));
       var session=Date.now().toString(36)+'_'+key;
       var chunks=[];
-      for(var i=0;i<b64.length;i+=CHUNK_RAW)chunks.push(b64.substring(i,i+CHUNK_RAW));
+      for(var i=0;i<b64.length;i+=CHUNK_B64)chunks.push(b64.substring(i,i+CHUNK_B64));
       var total=chunks.length;
       var ci=0;
       function sendChunk(){
