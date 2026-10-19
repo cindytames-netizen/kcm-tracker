@@ -1012,10 +1012,9 @@ function syncPush(){
   var fieldIdx=0;
   // Safe URL limit for JSONP script tag GET requests
   var GET_LIMIT=6000;
-  // base64 chars per chunk — base64 uses A-Z a-z 0-9 + / =
-  // encodeURIComponent turns + → %2B, / → %2F, = → %3D (triples those chars)
-  // Worst case ~50% of base64 chars are +/= → chunk of 800 base64 → ~1200 encoded → safe
-  var CHUNK_B64=800;
+  // Raw JSON chars per chunk. encodeURIComponent worst-case triples each char.
+  // 2000 raw × 3 = 6000 encoded, plus ~300 for base URL/params = ~6300 total. Safe.
+  var CHUNK_B64=2000;
 
   function sendField(){
     if(fieldIdx>=fields.length){
@@ -1037,16 +1036,16 @@ function syncPush(){
     if(testQs.length<=GET_LIMIT){
       gasGet(url,{action:'saveField',field:key,data:val,syncedAt:payload.syncedAt||''},done);
     } else {
-      // Large field — base64-encode and chunk into small pieces safe for URL encoding
-      var b64=btoa(unescape(encodeURIComponent(val)));
+      // Large field — chunk raw JSON into pieces small enough for URL encoding
+      // encodeURIComponent worst-case triples each char, so 2000 raw → max 6000 encoded
       var session=Date.now().toString(36)+'_'+key;
       var chunks=[];
-      for(var i=0;i<b64.length;i+=CHUNK_B64)chunks.push(b64.substring(i,i+CHUNK_B64));
+      for(var i=0;i<val.length;i+=CHUNK_B64)chunks.push(val.substring(i,i+CHUNK_B64));
       var total=chunks.length;
       var ci=0;
       function sendChunk(){
         if(ci>=total){
-          gasGet(url,{action:'assembleFieldB64',field:key,session:session,total:String(total),syncedAt:payload.syncedAt||''},function(d){
+          gasGet(url,{action:'assembleField',field:key,session:session,total:String(total),syncedAt:payload.syncedAt||''},function(d){
             if(!d.ok){setSyncBtnState(false);showSyncTag('Push error on '+key+': '+(d.error||'failed'),'var(--red)');return;}
             fieldIdx++;sendField();
           });
