@@ -1097,7 +1097,9 @@ function buildData() {
     var exp = new Date(r[0]);
     exp.setHours(0,0,0,0);
     var days = isNaN(exp) ? null : Math.round((exp - today) / 86400000);
-    var pol = {id:i, accountName:r[1], issuingCompany:r[2], advisor:r[3], description:r[4], expDate:exp, daysUntil:days, premium:'', docuSign:'', submitted:'', epicBilled:'', certsLender:'', binder:'', policySent:'', quoteGL:'', quoteProp:'', quoteUmb:'', quoteWC:'', quoteFlood:'', quoteBond:''};
+    // Use a stable key based on account+description so saved data survives row additions/reordering
+    var stableId = (r[1]+'||'+r[4]).replace(/[^a-zA-Z0-9|]/g,function(c){return '_';});
+    var pol = {id:stableId, _idx:i, accountName:r[1], issuingCompany:r[2], advisor:r[3], description:r[4], expDate:exp, daysUntil:days, premium:'', docuSign:'', submitted:'', epicBilled:'', certsLender:'', binder:'', policySent:'', quoteGL:'', quoteProp:'', quoteUmb:'', quoteWC:'', quoteFlood:'', quoteBond:''};
     policies.push(pol);
     if (!accounts[r[1]]) accounts[r[1]] = {name:r[1], advisor:r[3], status:'', followupLog:[], policies:[]};
     accounts[r[1]].policies.push(pol);
@@ -1240,7 +1242,21 @@ function loadSaved() {
     var rs=localStorage.getItem(SK);
     if(rs) {
       var ed=JSON.parse(rs);
-      if(ed.policies) { for(var i=0;i<policies.length;i++){var s=ed.policies[policies[i].id];if(s)Object.assign(policies[i],s);} }
+      if(ed.policies) {
+        // Detect old numeric-keyed data and migrate to stable keys
+        var keys=Object.keys(ed.policies);
+        var isNumeric=keys.length>0&&!isNaN(parseInt(keys[0],10))&&keys[0]===String(parseInt(keys[0],10));
+        if(isNumeric){
+          // Remap: old index → policy at that index in current RAW → stable id
+          var remapped={};
+          for(var ki=0;ki<keys.length;ki++){
+            var oldIdx=parseInt(keys[ki],10);
+            if(policies[oldIdx]){remapped[policies[oldIdx].id]=ed.policies[keys[ki]];}
+          }
+          ed.policies=remapped;
+        }
+        for(var i=0;i<policies.length;i++){var s=ed.policies[policies[i].id];if(s)Object.assign(policies[i],s);}
+      }
       if(ed.accounts) { var ns=Object.keys(ed.accounts); for(var i=0;i<ns.length;i++){var n=ns[i];if(accounts[n]){var lsSt=ed.accounts[n].status||'';var lsDs=ed.accounts[n].dateStatuses||{};if(lsSt.toLowerCase()==='bound'&&Object.keys(lsDs).length>0)lsSt='';Object.assign(accounts[n],{status:lsSt,boundCarrier:ed.accounts[n].boundCarrier||'',boundPremium:ed.accounts[n].boundPremium||'',boundDates:ed.accounts[n].boundDates||[],dateStatuses:lsDs,followupLog:ed.accounts[n].followupLog||[],dateNotes:ed.accounts[n].dateNotes||{}});}} }
     }
     var nb=localStorage.getItem(SK_NB); if(nb)newBiz=JSON.parse(nb);
@@ -1660,14 +1676,14 @@ function makeCard(a,visiblePols) {
     var p=pols[i];
     var isCancA=isCancelled(a);
     var chk='';
-    if(!isCancA){for(var j=0;j<CHK.length;j++){var f=CHK[j];chk+='<span class="chk '+(isTruthy(p[f.k])?'done':'undone')+'" onclick="togglePol('+p.id+',\''+f.k+'\',this,event)">'+(isTruthy(p[f.k])?'✔ ':'')+f.l+'</span>';}}
+    if(!isCancA){for(var j=0;j<CHK.length;j++){var f=CHK[j];chk+='<span class="chk '+(isTruthy(p[f.k])?'done':'undone')+'" onclick="togglePol(\''+p.id+'\',\''+f.k+'\',this,event)">'+(isTruthy(p[f.k])?'✔ ':'')+f.l+'</span>';}}
     var qchk='';
-    if(!isCancA){for(var j=0;j<QUOTES.length;j++){var q=QUOTES[j];if(isRelevantQuote(p.description,q.k))qchk+='<span class="qchk '+(isTruthy(p[q.k])?'done':'undone')+'" onclick="togglePol('+p.id+',\''+q.k+'\',this,event)">'+(isTruthy(p[q.k])?'✔ ':'')+q.l+'</span>';}}
+    if(!isCancA){for(var j=0;j<QUOTES.length;j++){var q=QUOTES[j];if(isRelevantQuote(p.description,q.k))qchk+='<span class="qchk '+(isTruthy(p[q.k])?'done':'undone')+'" onclick="togglePol(\''+p.id+'\',\''+q.k+'\',this,event)">'+(isTruthy(p[q.k])?'✔ ':'')+q.l+'</span>';}}
     var pd=p.expDate&&!isNaN(p.expDate)?fmtD(p.expDate):'';
     var premVal=p.premium||'';
     var premNum=parseFloat(premVal.toString().replace(/[$,]/g,''));
     if(!isNaN(premNum)&&premNum>0)totalPrem+=premNum;
-    var premInp='<div class="pl-premium"><label>💲 Premium</label><input type="text" placeholder="Enter amount" value="'+premVal.replace(/"/g,'&quot;')+'" onchange="setPremium('+p.id+',this.value)" onclick="event.stopPropagation()" onkeydown="event.stopPropagation()"></div>';
+    var premInp='<div class="pl-premium"><label>💲 Premium</label><input type="text" placeholder="Enter amount" value="'+premVal.replace(/"/g,'&quot;')+'" onchange="setPremium(\''+p.id+'\',this.value)" onclick="event.stopPropagation()" onkeydown="event.stopPropagation()"></div>';
     polLines+='<div class="policy-line"><div class="pl-top"><span class="pl-desc">'+p.description+'</span><div class="pl-meta"><span class="pl-carrier">'+p.issuingCompany+'</span><span class="pl-date">📅 '+pd+'</span></div></div>'+premInp+(chk?'<div class="pl-checks">'+chk+'</div>':'')+(qchk?'<div class="pl-quotes">'+qchk+'</div>':'')+'</div>';
   }
   var premTotalBadge=totalPrem>0?'<span class="pl-prem-total">💲'+totalPrem.toLocaleString('en-US',{minimumFractionDigits:0,maximumFractionDigits:0})+'</span>':'';
