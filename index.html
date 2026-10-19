@@ -1039,7 +1039,8 @@ function syncPush(){
       // Large field — first clear any orphaned chunks from previous failed pushes,
       // then chunk raw JSON into pieces small enough for URL encoding
       showSyncTag('Clearing old chunks…','#1a6fa8');
-      gasGet(url,{action:'clearChunks'},function(){
+      gasGet(url,{action:'clearChunks'},function(dc){
+        if(dc&&dc.ok===false){setSyncBtnState(false);showSyncTag('clearChunks failed: '+(dc.error||'unknown'),'var(--red)');return;}
         var session=Date.now().toString(36)+'_'+key;
         var chunks=[];
         for(var i=0;i<val.length;i+=CHUNK_B64)chunks.push(val.substring(i,i+CHUNK_B64));
