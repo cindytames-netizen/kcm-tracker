@@ -1006,7 +1006,14 @@ function testSyncConnection(){
 function syncPush(){
   var url=getSyncUrl();
   setSyncBtnState(true);
-  showSyncTag('Pushing…','#1a6fa8');
+  showSyncTag('Clearing old data…','#1a6fa8');
+  // Always clear leftover chunk rows in the sheet before pushing
+  gasGet(url,{action:'clearChunks'},function(){
+    doPush();
+  });
+}
+function doPush(){
+  var url=getSyncUrl();
   var payload=getSyncPayload();
   var fields=['policies','accounts','newBiz','rules'];
   var fieldIdx=0;
@@ -1036,11 +1043,8 @@ function syncPush(){
     if(testQs.length<=GET_LIMIT){
       gasGet(url,{action:'saveField',field:key,data:val,syncedAt:payload.syncedAt||''},done);
     } else {
-      // Large field — first clear any orphaned chunks from previous failed pushes,
-      // then chunk raw JSON into pieces small enough for URL encoding
-      showSyncTag('Clearing old chunks…','#1a6fa8');
-      gasGet(url,{action:'clearChunks'},function(dc){
-        if(dc&&dc.ok===false){setSyncBtnState(false);showSyncTag('clearChunks failed: '+(dc.error||'unknown'),'var(--red)');return;}
+      // Large field — chunk raw JSON into pieces small enough for URL encoding
+      (function(){
         var session=Date.now().toString(36)+'_'+key;
         var chunks=[];
         for(var i=0;i<val.length;i+=CHUNK_B64)chunks.push(val.substring(i,i+CHUNK_B64));
@@ -1061,7 +1065,7 @@ function syncPush(){
           });
         }
         sendChunk();
-      });
+      })();
     }
   }
   sendField();
