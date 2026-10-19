@@ -1036,28 +1036,31 @@ function syncPush(){
     if(testQs.length<=GET_LIMIT){
       gasGet(url,{action:'saveField',field:key,data:val,syncedAt:payload.syncedAt||''},done);
     } else {
-      // Large field — chunk raw JSON into pieces small enough for URL encoding
-      // encodeURIComponent worst-case triples each char, so 2000 raw → max 6000 encoded
-      var session=Date.now().toString(36)+'_'+key;
-      var chunks=[];
-      for(var i=0;i<val.length;i+=CHUNK_B64)chunks.push(val.substring(i,i+CHUNK_B64));
-      var total=chunks.length;
-      var ci=0;
-      function sendChunk(){
-        if(ci>=total){
-          gasGet(url,{action:'assembleField',field:key,session:session,total:String(total),syncedAt:payload.syncedAt||''},function(d){
-            if(!d.ok){setSyncBtnState(false);showSyncTag('Push error on '+key+': '+(d.error||'failed'),'var(--red)');return;}
-            fieldIdx++;sendField();
+      // Large field — first clear any orphaned chunks from previous failed pushes,
+      // then chunk raw JSON into pieces small enough for URL encoding
+      showSyncTag('Clearing old chunks…','#1a6fa8');
+      gasGet(url,{action:'clearChunks'},function(){
+        var session=Date.now().toString(36)+'_'+key;
+        var chunks=[];
+        for(var i=0;i<val.length;i+=CHUNK_B64)chunks.push(val.substring(i,i+CHUNK_B64));
+        var total=chunks.length;
+        var ci=0;
+        function sendChunk(){
+          if(ci>=total){
+            gasGet(url,{action:'assembleField',field:key,session:session,total:String(total),syncedAt:payload.syncedAt||''},function(d){
+              if(!d.ok){setSyncBtnState(false);showSyncTag('Push error on '+key+': '+(d.error||'failed'),'var(--red)');return;}
+              fieldIdx++;sendField();
+            });
+            return;
+          }
+          showSyncTag('Pushing '+key+' '+(ci+1)+'/'+total+'…','#1a6fa8');
+          gasGet(url,{action:'chunkField',session:session,idx:String(ci),data:chunks[ci]},function(d){
+            if(!d.ok){setSyncBtnState(false);showSyncTag('Push error on '+key+' chunk '+(ci+1)+': '+(d.error||'failed'),'var(--red)');return;}
+            ci++;setTimeout(sendChunk,200);
           });
-          return;
         }
-        showSyncTag('Pushing '+key+' '+(ci+1)+'/'+total+'…','#1a6fa8');
-        gasGet(url,{action:'chunkField',session:session,idx:String(ci),data:chunks[ci]},function(d){
-          if(!d.ok){setSyncBtnState(false);showSyncTag('Push error on '+key+' chunk '+(ci+1)+': '+(d.error||'failed'),'var(--red)');return;}
-          ci++;setTimeout(sendChunk,200);
-        });
-      }
-      sendChunk();
+        sendChunk();
+      });
     }
   }
   sendField();
