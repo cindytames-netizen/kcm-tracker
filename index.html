@@ -1,183 +1,1985 @@
-// KCM Renewal Tracker — Google Apps Script
-// Replace ALL contents with this file, then Deploy → Manage Deployments → New Version → Deploy.
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>KCM Renewal Tracker</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+:root{--sky:#4AAFE8;--sky-light:#E8F6FD;--sky-dark:#1A7CB8;--green:#3A7D5C;--green-light:#E6F2EC;--green-dark:#255440;--bg:#F0F4F8;--border:#D0E8F5;--text:#1C2B36;--muted:#6B8A99;--red:#E05252;--yellow:#E8A83A;--orange:#E8733A;--purple:#7C5CBF;--radius:14px;--shadow:0 2px 12px rgba(0,0,0,0.08);}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'Segoe UI',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;}
+header{background:linear-gradient(135deg,var(--sky-dark),var(--green));padding:0 28px;display:flex;align-items:stretch;justify-content:space-between;box-shadow:0 4px 20px rgba(0,0,0,0.15);}
+.header-left{display:flex;align-items:center;gap:14px;padding:18px 0;}
+.header-logo{width:42px;height:42px;background:rgba(255,255,255,0.2);border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:22px;}
+.header-title h1{color:white;font-size:20px;font-weight:700;}
+.header-title p{color:rgba(255,255,255,0.7);font-size:12px;margin-top:2px;}
+.header-right{display:flex;align-items:center;gap:10px;}
+.hbtn{border:none;padding:8px 14px;border-radius:10px;cursor:pointer;font-weight:600;font-size:12px;display:flex;align-items:center;gap:6px;transition:all 0.2s;background:rgba(255,255,255,0.2);color:white;border:1px solid rgba(255,255,255,0.3);}
+.hbtn:hover{background:rgba(255,255,255,0.35);}
+.saved-tag{background:rgba(255,255,255,0.9);color:var(--green-dark);border-radius:8px;padding:4px 12px;font-size:11px;font-weight:700;display:none;}
+.tabs{display:flex;background:white;border-bottom:2px solid var(--border);padding:0 28px;overflow-x:auto;}
+.tab{padding:14px 20px;font-size:13px;font-weight:600;cursor:pointer;color:var(--muted);border-bottom:3px solid transparent;margin-bottom:-2px;transition:all 0.2s;display:flex;align-items:center;gap:7px;white-space:nowrap;}
+.tab:hover{color:var(--sky-dark);}
+.tab.active{color:var(--sky-dark);border-bottom-color:var(--sky);}
+.tab-badge{border-radius:20px;padding:2px 8px;font-size:11px;font-weight:700;background:var(--sky-light);color:var(--sky-dark);}
+.tab.active .tab-badge{background:var(--sky);color:white;}
+.tab-badge.alert{background:#FDEAEA;color:var(--red);}
+.tab.active .tab-badge.alert{background:var(--red);color:white;}
+.stats-bar{display:flex;gap:14px;padding:18px 28px;flex-wrap:wrap;}
+.stat{background:white;border-radius:var(--radius);padding:14px 20px;flex:1;min-width:120px;box-shadow:var(--shadow);border-top:4px solid var(--border);transition:transform 0.2s;}
+.stat:hover{transform:translateY(-2px);}
+.stat.s-sky{border-top-color:var(--sky);}.stat.s-red{border-top-color:var(--red);}
+.stat.s-yellow{border-top-color:var(--yellow);}.stat.s-green{border-top-color:var(--green);}
+.stat .lbl{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:0.6px;margin-bottom:6px;}
+.stat .val{font-size:26px;font-weight:800;}
+.stat.s-sky .val{color:var(--sky-dark);}.stat.s-red .val{color:var(--red);}
+.stat.s-yellow .val{color:var(--yellow);}.stat.s-green .val{color:var(--green);}
+.controls{display:flex;gap:10px;padding:0 28px 16px;flex-wrap:wrap;align-items:center;}
+.controls input,.controls select{border:1.5px solid var(--border);border-radius:10px;padding:8px 12px;font-size:12px;background:white;color:var(--text);outline:none;}
+.controls input{min-width:200px;}
+.seg{display:flex;background:#EEF5FA;border-radius:10px;padding:3px;}
+.seg-btn{padding:6px 14px;border-radius:8px;border:none;cursor:pointer;font-size:12px;font-weight:600;color:var(--muted);background:transparent;}
+.seg-btn.active{background:white;color:var(--sky-dark);box-shadow:0 1px 4px rgba(0,0,0,0.1);}
+.cbtn{border:none;padding:8px 14px;border-radius:10px;cursor:pointer;font-size:12px;font-weight:600;}
+.cbtn-red{background:#fdeaea;color:var(--red);}
+.cbtn-sky{background:var(--sky-light);color:var(--sky-dark);}
+.kanban{padding:0 28px 30px;display:flex;gap:18px;overflow-x:auto;align-items:flex-start;flex-wrap:wrap;}
+.kanban::-webkit-scrollbar{height:6px;}
+.kanban::-webkit-scrollbar-thumb{background:var(--sky);border-radius:3px;}
+.col{background:#E8EFF5;border-radius:var(--radius);min-width:400px;max-width:440px;flex-shrink:0;}
+.col-header{padding:14px 16px;display:flex;align-items:center;justify-content:space-between;border-bottom:2px solid rgba(0,0,0,0.06);}
+.col-header h3{font-size:13px;font-weight:700;}
+.col-count{background:white;color:var(--muted);border-radius:20px;padding:2px 10px;font-size:11px;font-weight:700;}
+.col-body{padding:12px;display:flex;flex-direction:column;gap:12px;}
+.acard{background:white;border-radius:14px;box-shadow:0 2px 10px rgba(0,0,0,0.08);border-left:5px solid var(--border);overflow:hidden;transition:all 0.2s;}
+.acard:hover{box-shadow:0 6px 22px rgba(0,0,0,0.13);transform:translateY(-2px);}
+.acard.urg-red{border-left-color:var(--red);}.acard.urg-yellow{border-left-color:var(--yellow);}
+.acard.urg-green{border-left-color:var(--green);}.acard.urg-past{border-left-color:#8B0000;}
+.acard.has-alerts{outline:2px solid var(--red);outline-offset:1px;}
+.acard-header{padding:16px 18px 12px;cursor:pointer;}
+.acard-name{font-size:15px;font-weight:800;margin-bottom:5px;line-height:1.3;}
+.acard-meta{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px;}
+.days-badge{display:inline-flex;align-items:center;padding:4px 11px;border-radius:20px;font-weight:700;font-size:12px;}
+.db-past{background:#F0E0E0;color:#8B0000;}.db-red{background:#FDEAEA;color:var(--red);}
+.db-yellow{background:#FEF5E7;color:#B8761A;}.db-green{background:var(--green-light);color:var(--green-dark);}
+.db-na{background:#eee;color:#999;}
+.policy-count{background:var(--sky-light);color:var(--sky-dark);border-radius:20px;padding:4px 10px;font-size:11px;font-weight:700;cursor:pointer;}
+.alert-pill{background:#FDEAEA;color:var(--red);display:inline-flex;align-items:center;padding:4px 10px;border-radius:20px;font-size:11px;font-weight:700;gap:3px;}
+.acard-advisor{display:flex;align-items:center;justify-content:space-between;}
+.advisor-tag{font-size:11px;color:var(--muted);font-weight:600;display:flex;align-items:center;gap:4px;}
+.advisor-tag span{background:var(--sky-light);color:var(--sky-dark);border-radius:20px;padding:3px 10px;}
+.status-select{border:1.5px solid var(--border);border-radius:8px;padding:4px 8px;font-size:11px;background:white;outline:none;cursor:pointer;}
+.acard-alerts{padding:8px 18px;background:#FFF8F8;border-top:1px solid #FFE0E0;}
+.alert-item{font-size:11px;color:var(--red);font-weight:600;padding:2px 0;}
+.policy-lines{display:none;border-top:1px solid #EEF5FA;}
+.policy-lines.open{display:block;}
+.policy-line{padding:10px 18px;border-bottom:1px solid #F0F6FA;background:#FAFCFF;}
+.policy-line:last-child{border-bottom:none;}
+.pl-top{display:flex;flex-direction:column;gap:4px;margin-bottom:6px;}
+.pl-desc{font-size:12px;font-weight:700;color:var(--text);}
+.pl-meta{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+.pl-carrier{font-size:10px;color:var(--muted);background:#EEF5FA;border-radius:6px;padding:2px 7px;font-weight:600;}
+.pl-date{font-size:10px;color:var(--muted);font-weight:600;}
+.pl-premium{display:flex;align-items:center;gap:5px;margin-top:5px;}
+.pl-premium label{font-size:10px;color:var(--muted);font-weight:600;}
+.pl-premium input{border:1.5px solid var(--border);border-radius:6px;padding:3px 7px;font-size:11px;font-weight:600;color:var(--text);width:120px;outline:none;background:white;}
+.pl-premium input:focus{border-color:var(--sky);}
+.pl-prem-total{font-size:11px;font-weight:700;color:var(--green-dark);background:var(--green-light);border-radius:20px;padding:3px 10px;}
+.pl-checks{display:flex;flex-wrap:wrap;gap:4px;margin-top:5px;}
+.chk{display:inline-flex;align-items:center;gap:3px;font-size:10px;font-weight:600;padding:3px 8px;border-radius:6px;cursor:pointer;user-select:none;border:1px solid transparent;}
+.chk.done{background:var(--green-light);color:var(--green-dark);border-color:var(--green);}
+.chk.undone{background:#f0f0f0;color:#999;border-color:#ddd;}
+.pl-quotes{display:flex;flex-wrap:wrap;gap:4px;margin-top:4px;}
+.qchk{display:inline-flex;align-items:center;gap:3px;font-size:10px;font-weight:600;padding:3px 8px;border-radius:6px;cursor:pointer;user-select:none;border:1px solid transparent;}
+.qchk.done{background:#E8F3FD;color:var(--sky-dark);border-color:var(--sky);}
+.qchk.undone{background:#f0f0f0;color:#999;border-color:#ddd;}
+.acard-footer{padding:10px 18px;border-top:1px solid #EEF5FA;display:flex;gap:6px;align-items:center;flex-wrap:wrap;}
+.expand-policies-btn{background:var(--sky-light);color:var(--sky-dark);border:none;border-radius:8px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer;}
+.followup-btn{background:#F0E8FF;color:var(--purple);border:none;border-radius:8px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer;}
+.acard-followup-panel{display:none;padding:10px 18px;border-top:1px solid #EEF5FA;background:#F9F9FF;}
+.acard-followup-panel.open{display:block;}
+.fl-item{display:flex;align-items:center;gap:8px;font-size:11px;padding:3px 0;border-bottom:1px dashed #eee;}
+.fl-date{color:var(--sky-dark);font-weight:700;white-space:nowrap;}
+.fl-del{background:none;border:none;cursor:pointer;color:#ccc;font-size:11px;margin-left:auto;}
+.add-fl-row{display:flex;gap:6px;margin-top:8px;}
+.add-fl-row input{flex:1;border:1.5px solid var(--border);border-radius:8px;padding:6px 10px;font-size:11px;outline:none;}
+.add-fl-btn{background:var(--purple);color:white;border:none;border-radius:8px;padding:6px 12px;cursor:pointer;font-size:11px;font-weight:700;}
+.action-section{padding:16px 28px 30px;}
+.action-group{margin-bottom:24px;}
+.action-group-title{font-size:13px;font-weight:700;margin-bottom:12px;}
+.action-card{background:white;border-radius:12px;padding:14px 18px;box-shadow:var(--shadow);display:flex;align-items:flex-start;gap:14px;border-left:4px solid var(--border);margin-bottom:8px;}
+.action-card.crit{border-left-color:var(--red);}.action-card.warn{border-left-color:var(--yellow);}.action-card.info{border-left-color:var(--sky);}
+.action-body{flex:1;}
+.action-title{font-size:13px;font-weight:700;margin-bottom:3px;}
+.action-sub{font-size:11px;color:var(--muted);}
+.action-meta{display:flex;gap:8px;margin-top:6px;flex-wrap:wrap;}
+.action-tag{font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;background:#EEF5FA;color:var(--sky-dark);}
+.action-tag.red{background:#FDEAEA;color:var(--red);}.action-tag.yellow{background:#FEF5E7;color:#B8761A;}.action-tag.green{background:var(--green-light);color:var(--green-dark);}
+.rules-section{padding:16px 28px 30px;}
+.rules-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;}
+.rule-card{background:white;border-radius:12px;padding:14px 18px;box-shadow:var(--shadow);margin-bottom:10px;display:flex;align-items:center;gap:14px;}
+.rule-body{flex:1;}.rule-name{font-size:13px;font-weight:700;margin-bottom:2px;}.rule-desc{font-size:11px;color:var(--muted);}
+.rule-toggle{cursor:pointer;width:38px;height:20px;background:#ddd;border-radius:10px;position:relative;border:none;transition:background 0.2s;flex-shrink:0;}
+.rule-toggle.on{background:var(--green);}
+.rule-toggle::after{content:'';position:absolute;width:16px;height:16px;background:white;border-radius:50%;top:2px;left:2px;transition:left 0.2s;}
+.rule-toggle.on::after{left:20px;}
+.rule-del{background:#fdeaea;color:var(--red);border:none;border-radius:8px;padding:5px 10px;cursor:pointer;font-size:11px;font-weight:700;}
+.add-rule-form{background:white;border-radius:12px;padding:20px;box-shadow:var(--shadow);margin-top:16px;display:none;}
+.add-rule-form.open{display:block;}
+.form-row{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px;}
+.form-row input,.form-row select{border:1.5px solid var(--border);border-radius:10px;padding:9px 12px;font-size:12px;background:white;outline:none;flex:1;min-width:140px;}
+.nb-top{display:flex;align-items:center;justify-content:space-between;padding:18px 28px 0;}
+.add-btn{background:linear-gradient(135deg,var(--sky),var(--green));color:white;border:none;padding:10px 18px;border-radius:12px;cursor:pointer;font-weight:700;font-size:13px;display:flex;align-items:center;gap:6px;}
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.4);display:flex;align-items:center;justify-content:center;z-index:1000;padding:20px;backdrop-filter:blur(4px);}
+.modal{background:white;border-radius:20px;width:100%;max-width:540px;box-shadow:0 20px 60px rgba(0,0,0,0.2);overflow:hidden;}
+.modal-header{background:linear-gradient(135deg,var(--sky-dark),var(--green));padding:20px 24px;color:white;}
+.modal-header h2{font-size:16px;font-weight:700;}
+.modal-header p{font-size:12px;opacity:0.8;margin-top:3px;}
+.modal-body{padding:20px 24px;display:flex;flex-direction:column;gap:12px;max-height:65vh;overflow-y:auto;}
+.field-group{display:flex;flex-direction:column;gap:5px;}
+.field-group label{font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;}
+.field-group input,.field-group select,.field-group textarea{border:1.5px solid var(--border);border-radius:10px;padding:9px 12px;font-size:13px;font-family:inherit;outline:none;}
+.field-group textarea{resize:vertical;min-height:60px;}
+.modal-footer{padding:14px 24px;border-top:1px solid var(--border);display:flex;gap:10px;justify-content:flex-end;}
+.mbtn{border:none;padding:10px 20px;border-radius:10px;cursor:pointer;font-weight:700;font-size:13px;}
+.mbtn-cancel{background:#f0f0f0;color:var(--muted);}.mbtn-save{background:var(--sky);color:white;}.mbtn-delete{background:#fdeaea;color:var(--red);}
+.empty-state{text-align:center;padding:60px 20px;color:var(--muted);width:100%;}
+.empty-state .icon{font-size:52px;margin-bottom:14px;}
+.empty-state h3{font-size:16px;font-weight:700;margin-bottom:6px;color:var(--text);}
+.hidden{display:none!important;}
+.comp-banner{padding:6px 18px;background:var(--green-light);border-bottom:1px solid var(--green);display:flex;align-items:center;gap:6px;}
+.canc-banner{padding:6px 18px;background:#F5F5F5;border-bottom:1px solid #ddd;display:flex;align-items:center;gap:6px;}
+</style>
+</head>
+<body>
+<header>
+  <div class="header-left">
+    <div class="header-logo">🔄</div>
+    <div class="header-title"><h1>Team KCM Tracker</h1><p id="headerSub">Loading...</p></div>
+  </div>
+  <div class="header-right">
+    <button class="hbtn" onclick="document.getElementById('fileInput').click()">📂 Upload</button>
+    <input type="file" id="fileInput" accept=".xlsx,.xls,.csv" onchange="handleFile(event)" style="display:none">
+    <button class="hbtn" onclick="saveAll()">💾 Save</button>
+    <button class="hbtn" onclick="exportCSV()">⬇ Export</button>
+    <button class="hbtn" id="syncPullBtn" onclick="syncPull()" title="Pull latest from cloud">☁️ Pull</button>
+    <button class="hbtn" id="syncPushBtn" onclick="syncPush()" title="Push your data to cloud">⬆️ Push</button>
+    <button class="hbtn" onclick="openSyncConfig()" title="Cloud sync settings" style="padding:8px 10px;">⚙️</button>
+    <button class="hbtn" onclick="debugAccount()" title="Debug account state" style="padding:8px 10px;background:#fff3cd;color:#856404;">🔍 Debug</button>
+    <span class="saved-tag" id="savedTag">✔ Saved!</span>
+    <span class="saved-tag" id="syncTag" style="background:rgba(255,255,255,0.9);color:#1a6fa8;display:none;"></span>
+  </div>
+</header>
 
-function doGet(e) {
-  var params   = e.parameter || {};
-  var action   = params.action   || '';
-  var callback = params.callback || '';
+<div class="tabs">
+  <div class="tab active" id="tab-renewals" onclick="switchTab('renewals')">🔄 Renewals <span class="tab-badge" id="tb-renewals">0</span></div>
+  <div class="tab" id="tab-actions" onclick="switchTab('actions')">🚨 Action Items <span class="tab-badge alert" id="tb-actions">0</span></div>
+  <div class="tab" id="tab-newbiz" onclick="switchTab('newbiz')">✨ New Business <span class="tab-badge" id="tb-newbiz">0</span></div>
+  <div class="tab" id="tab-completed" onclick="switchTab('completed')">✅ Completed <span class="tab-badge" id="tb-completed">0</span></div>
+  <div class="tab" id="tab-cancelled" onclick="switchTab('cancelled')">🚫 Cancelled <span class="tab-badge" id="tb-cancelled">0</span></div>
+  <div class="tab" id="tab-rules" onclick="switchTab('rules')">⚙️ Rules <span class="tab-badge" id="tb-rules">0</span></div>
+</div>
 
-  function respond(obj) {
-    var json = JSON.stringify(obj);
-    var out  = callback ? callback + '(' + json + ')' : json;
-    return ContentService.createTextOutput(out)
-      .setMimeType(callback ? ContentService.MimeType.JAVASCRIPT : ContentService.MimeType.JSON);
+<div id="section-renewals">
+  <div class="stats-bar">
+    <div class="stat s-sky"><div class="lbl">Accounts</div><div class="val" id="sTotal">0</div></div>
+    <div class="stat s-red"><div class="lbl">≤ 30 Days</div><div class="val" id="s30">0</div></div>
+    <div class="stat s-yellow"><div class="lbl">31–60 Days</div><div class="val" id="s60">0</div></div>
+    <div class="stat s-green"><div class="lbl">60+ Days</div><div class="val" id="s60p">0</div></div>
+    <div class="stat s-red"><div class="lbl">Overdue</div><div class="val" id="sOvr">0</div></div>
+  </div>
+  <div class="controls">
+    <input type="text" id="rSearch" placeholder="🔍 Search account..." oninput="renderRenewals()">
+    <select id="rAdvisor" onchange="renderRenewals()"><option value="">All Advisors</option></select>
+    <select id="rMonth" onchange="renderRenewals()"><option value="">All Months</option></select>
+    <select id="rUrgency" onchange="renderRenewals()">
+      <option value="">All Urgency</option><option value="past">Overdue</option>
+      <option value="red">≤ 30 Days</option><option value="yellow">31–60 Days</option><option value="green">60+ Days</option>
+    </select>
+    <select id="rAlerts" onchange="renderRenewals()"><option value="">All</option><option value="alerts">🚨 Alerts Only</option></select>
+    <div class="seg">
+      <button class="seg-btn active" id="grp-weekly" onclick="setGroup('weekly')">Weekly</button>
+      <button class="seg-btn" id="grp-biweekly" onclick="setGroup('biweekly')">Biweekly</button>
+      <button class="seg-btn" id="grp-day" onclick="setGroup('day')">Daily</button>
+    </div>
+    <button class="cbtn cbtn-sky" onclick="setCurrentMonth()">📅 This Month</button>
+    <button class="cbtn cbtn-red" onclick="clearRFilters()">✕ Clear</button>
+  </div>
+  <div class="kanban" id="kanban-renewals"></div>
+</div>
+
+<div id="section-actions" class="hidden">
+  <div class="stats-bar">
+    <div class="stat s-red"><div class="lbl">🔴 Critical</div><div class="val" id="aCrit">0</div></div>
+    <div class="stat s-yellow"><div class="lbl">🟡 Needs Attention</div><div class="val" id="aWarn">0</div></div>
+    <div class="stat s-sky"><div class="lbl">🔵 Upcoming</div><div class="val" id="aInfo">0</div></div>
+  </div>
+  <div style="padding:10px 28px 0;display:flex;gap:10px;flex-wrap:wrap;">
+    <input type="text" id="actionSearch" placeholder="🔍 Search..." oninput="renderActions()" style="border:1.5px solid var(--border);border-radius:10px;padding:8px 12px;font-size:12px;outline:none;min-width:220px;background:white;">
+    <select id="actionSeverity" onchange="renderActions()" style="border:1.5px solid var(--border);border-radius:10px;padding:8px 12px;font-size:12px;background:white;outline:none;">
+      <option value="">All Severities</option><option value="crit">🔴 Critical</option><option value="warn">🟡 Needs Attention</option><option value="info">🔵 Upcoming</option>
+    </select>
+    <select id="actionAdvisor" onchange="renderActions()" style="border:1.5px solid var(--border);border-radius:10px;padding:8px 12px;font-size:12px;background:white;outline:none;"><option value="">All Advisors</option></select>
+  </div>
+  <div class="action-section" id="action-section"></div>
+</div>
+
+<div id="section-newbiz" class="hidden">
+  <div class="stats-bar">
+    <div class="stat s-sky"><div class="lbl">Total</div><div class="val" id="nbTotal">0</div></div>
+    <div class="stat s-yellow"><div class="lbl">In Progress</div><div class="val" id="nbProg">0</div></div>
+    <div class="stat s-green"><div class="lbl">Bound</div><div class="val" id="nbBound">0</div></div>
+    <div class="stat s-red"><div class="lbl">Pending</div><div class="val" id="nbPend">0</div></div>
+  </div>
+  <div class="nb-top">
+    <div class="controls" style="padding:0">
+      <input type="text" id="nbSearch" placeholder="🔍 Search..." oninput="renderNewBiz()">
+      <select id="nbAdvisor" onchange="renderNewBiz()"><option value="">All Advisors</option></select>
+    </div>
+    <button class="add-btn" onclick="openModal(null)">＋ Add New Business</button>
+  </div>
+  <div class="kanban" id="kanban-newbiz" style="margin-top:16px;"></div>
+</div>
+
+<div id="section-completed" class="hidden">
+  <div class="stats-bar">
+    <div class="stat s-green"><div class="lbl">Completed</div><div class="val" id="compTotal">0</div></div>
+    <div class="stat s-sky"><div class="lbl">This Month</div><div class="val" id="compMonth">0</div></div>
+  </div>
+  <div class="controls">
+    <input type="text" id="compSearch" placeholder="🔍 Search completed..." oninput="renderCompleted()">
+    <select id="compAdvisor" onchange="renderCompleted()"><option value="">All Advisors</option></select>
+  </div>
+  <div class="kanban" id="kanban-completed"></div>
+</div>
+
+<div id="section-cancelled" class="hidden">
+  <div class="stats-bar">
+    <div class="stat s-red"><div class="lbl">Cancelled</div><div class="val" id="cancTotal">0</div></div>
+    <div class="stat s-sky"><div class="lbl">This Month</div><div class="val" id="cancMonth">0</div></div>
+  </div>
+  <div class="controls">
+    <input type="text" id="cancSearch" placeholder="🔍 Search cancelled..." oninput="renderCancelled()">
+    <select id="cancAdvisor" onchange="renderCancelled()"><option value="">All Advisors</option></select>
+  </div>
+  <div class="kanban" id="kanban-cancelled"></div>
+</div>
+
+<div id="section-rules" class="hidden">
+  <div class="rules-section">
+    <div class="rules-header">
+      <div><h2 style="font-size:16px;font-weight:700;">⚙️ Rules</h2><p style="font-size:12px;color:var(--muted);margin-top:4px;">Automated alerts on cards and Action Items tab</p></div>
+      <button class="add-btn" onclick="toggleAddRule()">＋ Add Rule</button>
+    </div>
+    <div id="rules-list"></div>
+    <div class="add-rule-form" id="addRuleForm">
+      <h3 style="font-size:14px;font-weight:700;margin-bottom:14px;">➕ New Rule</h3>
+      <div class="form-row"><input id="rName" placeholder="Rule name"></div>
+      <div class="form-row">
+        <select id="rField"><option value="submitted">Submitted is</option><option value="policySent">Policy Sent is</option><option value="bound">Bound is</option><option value="epicBilled">EPIC Billed is</option></select>
+        <select id="rOp"><option value="notChecked">not checked</option></select>
+        <input id="rVal" placeholder="Value (if needed)">
+      </div>
+      <div class="form-row">
+        <select id="rDaysCond"><option value="any">Any time</option><option value="lte">Days until ≤</option><option value="gte">Days until ≥</option></select>
+        <input id="rDaysVal" type="number" placeholder="Days" style="max-width:120px">
+      </div>
+      <div class="form-row">
+        <input id="rMsg" placeholder="Alert message">
+        <select id="rSeverity"><option value="crit">🔴 Critical</option><option value="warn">🟡 Needs Attention</option><option value="info">🔵 Upcoming</option></select>
+      </div>
+      <div style="display:flex;gap:10px;justify-content:flex-end;">
+        <button class="mbtn mbtn-cancel" onclick="toggleAddRule()">Cancel</button>
+        <button class="mbtn mbtn-save" onclick="saveRule()">Save Rule</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- REWRITE MODAL -->
+<div class="modal-overlay hidden" id="rewriteOverlay" onclick="if(event.target===this)closeRewrite()">
+<div class="modal">
+  <div class="modal-header"><h2>🔁 Rewrite — Update Policy Dates</h2><p id="rewriteAcctName"></p></div>
+  <div class="modal-body" id="rewriteBody"></div>
+  <div class="modal-footer">
+    <button class="mbtn mbtn-cancel" onclick="closeRewrite()">Cancel</button>
+    <button class="mbtn mbtn-save" onclick="saveRewrite()">Save & Update Dates</button>
+  </div>
+</div>
+</div>
+
+<!-- NEW BIZ MODAL -->
+<div class="modal-overlay hidden" id="modalOverlay" onclick="if(event.target===this)closeModal()">
+<div class="modal">
+  <div class="modal-header"><h2 id="modalTitle">New Business</h2><p id="modalSub"></p></div>
+  <div class="modal-body">
+    <div class="field-group"><label>Account Name</label><input id="mName"></div>
+    <div class="field-group"><label>Description / LOB</label><input id="mDesc"></div>
+    <div class="field-group"><label>Effective Date</label><input id="mDate" type="date"></div>
+    <div class="field-group"><label>Advisor</label>
+      <select id="mAdvisor"><option>Guy Billups</option><option>Todd Range</option><option>Riley Wilhoit</option><option>Ray Deaton</option><option>Todd Sherrer</option><option>Brad Soto</option><option>Brent Guldahl</option><option>DJ Drysdale Jr</option><option>Agency House - CIS</option></select>
+    </div>
+    <div class="field-group"><label>Carrier</label><input id="mCarrier"></div>
+    <div class="field-group"><label>Status</label>
+      <select id="mStatus"><option value="">— Select —</option><option>Active</option><option>In Progress</option><option>Pending</option><option>Proposed</option><option>Quoted</option><option>Bound</option><option>Cancelled</option><option>Non-Renewal</option><option>Rewrite</option></select>
+    </div>
+    <div class="field-group"><label>Notes</label><textarea id="mNotes"></textarea></div>
+  </div>
+  <div class="modal-footer">
+    <button class="mbtn mbtn-delete hidden" id="mDelete" onclick="deleteEntry()">🗑 Delete</button>
+    <button class="mbtn mbtn-cancel" onclick="closeModal()">Cancel</button>
+    <button class="mbtn mbtn-save" onclick="saveModal()">Save</button>
+  </div>
+</div>
+</div>
+
+<div class="modal-overlay hidden" id="boundOverlay" onclick="if(event.target===this)closeBoundModal()">
+<div class="modal" style="max-width:560px;">
+  <div class="modal-header"><h2>✅ Mark as Bound</h2><p id="boundAcctName" style="font-size:13px;font-weight:700;color:var(--text);margin-top:4px;"></p></div>
+  <div class="modal-body">
+    <div id="boundPolLines" style="display:flex;flex-direction:column;gap:14px;"></div>
+  </div>
+  <div class="modal-footer">
+    <button class="mbtn mbtn-cancel" onclick="closeBoundModal()">Cancel</button>
+    <button class="mbtn mbtn-save" onclick="confirmBound()">✅ Confirm Bound</button>
+  </div>
+</div>
+</div>
+
+<!-- Sync Config Modal -->
+<div class="modal-overlay hidden" id="syncOverlay" onclick="if(event.target===this)closeSyncConfig()">
+<div class="modal" style="max-width:500px;">
+  <div class="modal-header"><h2>☁️ Cloud Sync Setup</h2><p style="font-size:12px;color:var(--muted);margin-top:6px;">Syncs via your Google Apps Script. Both you and your teammate use the same URL.</p></div>
+  <div class="modal-body">
+    <div class="field-group">
+      <label>Google Apps Script URL</label>
+      <input id="syncBinId" placeholder="https://script.google.com/macros/s/..." style="font-family:monospace;font-size:11px;">
+      <p style="font-size:11px;color:var(--muted);margin-top:4px;">Pre-filled with your deployed script URL. Only change if you redeploy.</p>
+    </div>
+    <div id="syncStatus" style="font-size:12px;padding:8px 0;color:var(--muted);min-height:20px;"></div>
+  </div>
+  <div class="modal-footer">
+    <button class="mbtn mbtn-cancel" onclick="closeSyncConfig()">Close</button>
+    <button class="mbtn" style="background:#e8f4fd;color:#1a6fa8;" onclick="testSyncConnection()">🔗 Test Connection</button>
+    <button class="mbtn mbtn-save" onclick="saveSyncConfig()">Save Settings</button>
+  </div>
+</div>
+</div>
+
+<script>
+var SK='kcm_v5', SK_NB='kcm_nb_v3', SK_RULES='kcm_rules_v3', SK_RAW='kcm_raw_v1';
+var ADVISORS=['Guy Billups','Todd Range','Riley Wilhoit','Ray Deaton','Todd Sherrer','Brad Soto','Brent Guldahl','DJ Drysdale Jr','Agency House - CIS'];
+var CHK=[{k:'docuSign',l:'DocuSign'},{k:'submitted',l:'Submitted'},{k:'epicBilled',l:'EPIC'},{k:'certsLender',l:'Certs'},{k:'binder',l:'Binder'},{k:'policySent',l:'Policy Sent'}];
+var QUOTES=[{k:'quoteGL',l:'GL'},{k:'quoteProp',l:'Property'},{k:'quoteUmb',l:'Umbrella'},{k:'quoteWC',l:'Work Comp'},{k:'quoteFlood',l:'Flood'},{k:'quoteBond',l:'Bond'}];
+var DEFAULT_RULES=[
+  {id:'r2',name:'Not Submitted (120 days)',desc:'No submission and renewal ≤ 120 days',field:'submitted',op:'notChecked',val:'',daysCond:'lte',daysVal:120,msg:'Escalate — not yet submitted',severity:'crit',on:true,builtIn:true},
+  {id:'r3',name:'Bound but Policy Not Sent',desc:'Policy bound but not sent to insured',field:'policySent',op:'notChecked',val:'',daysCond:'any',daysVal:0,msg:'Follow up — send policy to insured',severity:'warn',on:true,builtIn:true}
+];
+var today=new Date(); today.setHours(0,0,0,0);
+var policies=[], accounts={}, newBiz=[], rules=[], groupBy='weekly';
+var editingId=null, rewriteAcct=null, rewriteSel=null;
+
+var RAW=[
+["3/31/2026","Bellator Builders & Development LLC","EVAIN1","Guy Billups","General Liability - Broken Bow Retreat HOA"],
+["3/31/2026","Westwind Enterprises, LTD","INTFI2","Todd Range","Bond - DMV Dealer Bond - Rio Bend $50k"],
+["4/1/2026","Dennis and Victoria Hetrick","WESSU2","Riley Wilhoit","Property - Lower Swiss"],
+["4/1/2026","Fred Fielder","TRASP1","Todd Range","Property - Primary $10M"],
+["4/1/2026","Fred Fielder","JAMRI1","Todd Range","General Liability - Parkridge"],
+["4/1/2026","Fred Fielder","FEDIN1","Todd Range","Commercial Umbrella - $10M"],
+["4/1/2026","Fred Fielder","LANAM1","Todd Range","Property - $63M XS $10M"],
+["4/1/2026","Fred Fielder","MULTI1","Todd Range","Terrorism"],
+["4/1/2026","Martine Properties, Inc.","GENST1","Ray Deaton","Property - Rockwood and The Oaks"],
+["4/1/2026","Martine Properties, Inc.","CENSU1","Ray Deaton","General Liability - Rockwood"],
+["4/1/2026","Martine Properties, Inc.","CENSU1","Ray Deaton","General Liability - The Oaks"],
+["4/1/2026","Martine Properties, Inc.","MIDIN5","Ray Deaton","Commercial Umbrella - $10M"],
+["4/1/2026","Martine Properties, Inc.","MULTI1","Ray Deaton","Property Terrorism"],
+["4/1/2026","ProdiGem LLC","EVAIN1","Ray Deaton","Liability - Tenant Discrimination"],
+["4/1/2026","ProdiGem LLC","TRASP1","Ray Deaton","Property - LA Locs"],
+["4/1/2026","ProdiGem LLC","THICO1","Ray Deaton","Property - Rohan Ridge"],
+["4/1/2026","ProdiGem LLC","COVSP1","Ray Deaton","General Liability"],
+["4/1/2026","ProdiGem LLC","NAUIN1","Ray Deaton","Commercial Umbrella $5M"],
+["4/1/2026","Regional Investment and Management","LANAM1","Todd Range","Property - Riverstone"],
+["4/1/2026","Regional Investment and Management","MIDIN5","Todd Range","Commercial Umbrella - StoneHaven"],
+["4/1/2026","Regional Investment and Management","TRACA3","Todd Range","Boiler & Machinery - Riverstone"],
+["4/1/2026","Regional Investment and Management","CONCA1","Todd Range","Boiler & Machinery - StoneHaven"],
+["4/1/2026","Regional Investment and Management","OLDRE5","Todd Range","Property - StoneHaven $10M Primary"],
+["4/1/2026","Regional Investment and Management","JAMRI1","Todd Range","General Liability - StoneHaven"],
+["4/1/2026","Regional Investment and Management","MULTI1","Todd Range","Property Terrorism - StoneHaven"],
+["4/1/2026","Regional Investment and Management","MULTI1","Todd Range","Property Terrorism - Riverstone"],
+["4/1/2026","Regional Investment and Management","CONI10","Todd Range","Property - Excess - StoneHaven"],
+["4/2/2026","Leuven Group","CENSU1","Todd Sherrer","General Liability - Ocean Palms"],
+["4/2/2026","Leuven Group","MIDIN5","Todd Sherrer","Commercial Umbrella - Ocean Palms"],
+["4/2/2026","Leuven Group","VELIN1","Todd Sherrer","Property - $5M Primary - Ocean Palms"],
+["4/2/2026","Leuven Group","MULTI1","Todd Sherrer","Property Terrorism - Ocean Palms"],
+["4/2/2026","Leuven Group","KININ1","Todd Sherrer","Property - Excess - Ocean Palms"],
+["4/2/2026","Leuven Group","TRAPR2","Todd Sherrer","Boiler & Machinery - Ocean Palms"],
+["4/5/2026","Chris Carbonel","CENIN5","Ray Deaton","General Liability"],
+["4/5/2026","Chris Carbonel","HOMIN7","Agency House - CIS","Commercial Umbrella - $10M"],
+["4/10/2026","ProdiGem LLC","KININ1","Ray Deaton","General Liability - 222 Lee Lane"],
+["4/10/2026","ProdiGem LLC","GOTIN2","Ray Deaton","Property - 222 Lee Lane"],
+["4/12/2026","Vance Elliot","ACCSU1","Todd Sherrer","Commercial Package"],
+["4/12/2026","Vance Elliot","MIDIN5","Todd Sherrer","Commercial Umbrella"],
+["4/12/2026","Vance Elliot","MULTI1","Todd Sherrer","Wind Deductible Buy Down Policy"],
+["4/17/2026","RanchlandMTX, LLC","MOUVE1","Todd Sherrer","General Liability - 10 4-Plexes"],
+["4/17/2026","RanchlandMTX, LLC","BERAS1","Todd Sherrer","General Liability - Vacant Towers"],
+["4/17/2026","RanchlandMTX, LLC","MIDIN5","Todd Sherrer","Commercial Umbrella"],
+["4/18/2026","ProdiGem LLC","GREAM1","Ray Deaton","Equipment Floater - Lee Drive"],
+["4/25/2026","Boone Forman Property, LP","TEXMU2","Brad Soto","Worker's Compensation"],
+["4/26/2026","Calton Investments, Inc.","ASSUR1","Todd Sherrer","Commercial Flood - Boerne Oaks"],
+["4/26/2026","Parker-Lam-Parker Family Trust","MOUVE1","Todd Sherrer","General Liability"],
+["4/26/2026","Parker-Lam-Parker Family Trust","MIDIN5","Todd Sherrer","Commercial Umbrella $10M"],
+["4/26/2026","Parker-Lam-Parker Family Trust","AMHSP2","Todd Sherrer","Property"],
+["4/27/2026","Lombard Group Texas, LLC","TRASP1","Todd Range","Property"],
+["4/27/2026","Lombard Group Texas, LLC","ADMIN1","Todd Range","General Liability"],
+["4/27/2026","Lombard Group Texas, LLC","STANA1","Todd Range","Commercial Umbrella"],
+["4/27/2026","Lombard Group Texas, LLC","TRACA3","Todd Range","Boiler & Machinery"],
+["4/27/2026","Lombard Group Texas, LLC","MULTI1","Todd Range","Terrorism - Property"],
+["4/29/2026","Winston 8, LLC","CENIN5","Todd Range","General Liability - Winston 8"],
+["4/30/2026","Landmark Properties, Inc.","ACCSP1","Todd Range","General Liability - Arden at Corinth"],
+["4/30/2026","Landmark Properties, Inc.","MIDIN5","Todd Range","Commercial Umbrella - Arden at Corinth"],
+["5/1/2026","Crestmarc Real Estate Investments, LLC","SCOIN1","Brent Guldahl","Employment Practices Liability"],
+["5/1/2026","Mark Hanson","MOUVE1","Todd Sherrer","General Liability - Ranchstone"],
+["5/1/2026","Mark Hanson","CENSU1","Todd Sherrer","General Liability - Terrain"],
+["5/1/2026","Mark Hanson","MIDIN5","Todd Sherrer","Commercial Umbrella - Terrain"],
+["5/1/2026","Mark Hanson","MIDIN5","Todd Sherrer","Commercial Umbrella - Ranchstone"],
+["5/4/2026","Bellator Builders & Development LLC","UNIST1","Guy Billups","Equipment Floater"],
+["5/4/2026","Bellator Builders & Development LLC","PROCO1","Guy Billups","Business Auto"],
+["5/5/2026","Equimax Management, LLC","ZENIN1","Todd Range","Worker's Compensation"],
+["5/8/2026","Perry Reid Properties","AFFFM1","Todd Range","Property - SkyLofts at The Heritage"],
+["5/8/2026","Perry Reid Properties","ACCSP1","Todd Range","General Liability - SkyLofts"],
+["5/8/2026","Perry Reid Properties","MIDIN5","Todd Range","Commercial Umbrella - SkyLofts"],
+["5/8/2026","ProdiGem LLC","EVAIN1","Ray Deaton","General Liability - PT Development"],
+["5/15/2026","Calton Investments, Inc.","LEXIN1","Todd Sherrer","Property - Whispering"],
+["5/15/2026","Calton Investments, Inc.","LEXIN1","Todd Sherrer","Property - Valhalla"],
+["5/15/2026","Leuven Group","LEXIN1","Todd Sherrer","Property - The Arts at Ocean Drive"],
+["5/15/2026","OSA Group Investments","LEXIN1","Todd Sherrer","Property - Santa Fe"],
+["5/15/2026","Starpoint Properties","LEXIN1","Todd Sherrer","Property - Dalewood"],
+["5/15/2026","TR3 Capital, LLC","LEXIN1","Todd Sherrer","Property - Marbach Oaks"],
+["5/17/2026","Manuel Cruz","TRAPR2","Todd Range","Commercial Package - Mac Plaza I35"],
+["5/18/2026","Simpson Real Estate","CENSU1","Todd Range","General Liability - Whisper Oaks"],
+["5/18/2026","Simpson Real Estate","MIDIN5","Todd Range","Comm Umbrella - Banita Creek"],
+["5/18/2026","Simpson Real Estate","UNIUN9","Todd Range","General Liability - Banita Creek"],
+["5/18/2026","Simpson Real Estate","MIDIN5","Todd Range","Comm Umbrella - Whisper Oaks"],
+["5/20/2026","Leuven Group","ACCSP1","Todd Sherrer","General Liability - Tuscana Bay"],
+["5/20/2026","Leuven Group","MIDIN5","Todd Sherrer","Commercial Umbrella - ICON at CC"],
+["5/20/2026","Southern Hills Partners, LLC","CENSU1","Todd Range","General Liability - Southern Hills"],
+["5/20/2026","Southern Hills Partners, LLC","STANA1","Todd Range","Commercial Umbrella - $10M"],
+["5/24/2026","Andy Sheehy","LANAM1","Todd Sherrer","Property"],
+["5/24/2026","Andy Sheehy","CENSU1","Todd Sherrer","General Liability"],
+["5/24/2026","Andy Sheehy","MIDIN5","Todd Sherrer","Commercial Umbrella"],
+["5/24/2026","Andy Sheehy","MULTI1","Todd Sherrer","Terrorism"],
+["5/24/2026","Andy Sheehy","HOMIN2","Todd Sherrer","Property - Excess"],
+["5/26/2026","Leuven Group","OLDRE5","Todd Sherrer","Property - Primary - The Current"],
+["5/26/2026","Leuven Group","JAMRI1","Todd Sherrer","Property - Excess - The Current"],
+["5/26/2026","Leuven Group","MULTI1","Todd Sherrer","Property Terrorism - The Current"],
+["5/26/2026","Leuven Group","TRAPR2","Todd Sherrer","Boiler & Machinery - The Current"],
+["5/30/2026","Jones Apartment Management","TRAPR2","Agency House - CIS","Worker's Compensation"],
+["6/1/2026","Perry Reid Properties","ZLLOYD","Todd Range","Property - Primary $10M - Johnston Commons"],
+["6/1/2026","Perry Reid Properties","CENSU1","Todd Range","General Liability - Johnston Commons"],
+["6/1/2026","Perry Reid Properties","TRAPR2","Todd Sherrer","Boiler & Machinery - Johnston Commons"],
+["6/1/2026","Perry Reid Properties","MIDIN5","Todd Range","Commercial Umbrella - Johnston Commons"],
+["6/1/2026","Perry Reid Properties","CONI10","Todd Range","Property - Excess - Johnston Commons"],
+["6/1/2026","Perry Reid Properties","ZLLOYD","Todd Range","Property - Terrorism - Johnston Commons"],
+["6/10/2026","Calton Investments, Inc.","TRAPR2","Todd Sherrer","Boiler & Machinery - Summit and Avalon"],
+["6/10/2026","Calton Investments, Inc.","GENST1","Todd Sherrer","Property - Avalon & Summit"],
+["6/10/2026","Calton Investments, Inc.","CENSU1","Todd Sherrer","General Liability - Paradise Village"],
+["6/10/2026","Calton Investments, Inc.","MAXIN1","Todd Sherrer","General Liability - Summit, Alamo Heights"],
+["6/10/2026","Calton Investments, Inc.","CENSU1","Todd Sherrer","General Liability - Whispering Winds"],
+["6/10/2026","Calton Investments, Inc.","MIDIN5","Todd Sherrer","Commercial Umbrella - Villa Madrid"],
+["6/10/2026","Calton Investments, Inc.","MIDIN5","Todd Sherrer","Commercial Umbrella - Paradise Village"],
+["6/10/2026","Calton Investments, Inc.","MIDIN5","Todd Sherrer","Commercial Umbrella - Whispering Winds"],
+["6/10/2026","Crestmarc Real Estate Investments, LLC","TRAPR2","Todd Range","Commercial Package - Office BOP"],
+["6/10/2026","Leuven Group","MIDIN5","Todd Sherrer","Commercial Umbrella - Energy Lodges"],
+["6/10/2026","Leuven Group","MIDIN5","Todd Sherrer","Commercial Umbrella - Arts on Ocean Drive"],
+["6/10/2026","Leuven Group","MIDIN5","Todd Sherrer","Commercial Umbrella - Medwest"],
+["6/10/2026","Leuven Group","WESFI1","Todd Sherrer","Employment Practices Liability"],
+["6/10/2026","Mark Hanson","MULTI1","Todd Sherrer","Excess Flood - Terrain"],
+["6/10/2026","Mark Hanson","AMHSP2","Todd Sherrer","Property - Ranchstone, St Edwards and Terrain"],
+["6/10/2026","Quilloy Management Company, LLC","MOUVE1","Todd Sherrer","General Liability"],
+["6/10/2026","Quilloy Management Company, LLC","MIDIN5","Todd Sherrer","Commercial Umbrella $5M"],
+["6/11/2026","ProdiGem LLC","ASSUR1","Ray Deaton","Commercial Flood - 28 Bldgs"],
+["6/15/2026","West Winds Village Apartments, LLC","TRASP1","Todd Sherrer","General Liability"],
+["6/16/2026","Starpoint Properties","OLDRE5","Todd Sherrer","Property - Primary"],
+["6/16/2026","Starpoint Properties","MULTI1","Todd Sherrer","Terrorism - Property"],
+["6/16/2026","Starpoint Properties","HOMIN2","Todd Sherrer","Property - Excess - Rewrite"],
+["6/25/2026","Westwind Enterprises, LTD","HARNA1","Todd Range","Bond - New Dealer Bond - Rio Bend RV $50k"],
+["6/28/2026","Manuel Cruz","TRAPR2","Todd Range","Commercial Package - The Creek at Stone Oak"],
+["6/30/2026","Bellator Builders & Development LLC","ATLSP1","Guy Billups","Builders Risk - Union Tech Phase II"],
+["6/30/2026","Heritage Asset Management LLC","MAXIN1","Ray Deaton","General Liability - Regency and Marquee West"],
+["6/30/2026","Heritage Asset Management LLC","WESWO1","Ray Deaton","General Liability - Tanglewood and Wildwood"],
+["6/30/2026","Heritage Asset Management LLC","MIDIN5","Ray Deaton","Commercial Umbrella - Regency"],
+["6/30/2026","Heritage Asset Management LLC","MIDIN5","Ray Deaton","Commercial Umbrella - Tanglewood"],
+["6/30/2026","ProdiGem LLC","WESFI1","Ray Deaton","Commercial Package - Michigan Vacant Lake House"],
+["7/1/2026","ProdiGem LLC","ZENIN1","Ray Deaton","Worker's Compensation"],
+["7/5/2026","Terra Nova Property Mgmt","STEIN1","Ray Deaton","Property - Houston and Odessa Lead"],
+["7/5/2026","Terra Nova Property Mgmt","MULTI1","Ray Deaton","Deductible Buy Down Policy"],
+["7/5/2026","Terra Nova Property Mgmt","PALSP1","Ray Deaton","Property - Houston and Odessa Primary"],
+["7/5/2026","Terra Nova Property Mgmt","KININ1","Ray Deaton","Property - Houston and Odessa x/s"],
+["7/5/2026","Terra Nova Property Mgmt","MULTI1","Ray Deaton","Property Excess - Houston ONLY"],
+["7/5/2026","Terra Nova Property Mgmt","PALSP1","Ray Deaton","Property Excess - Houston ONLY p/o"],
+["7/5/2026","Terra Nova Property Mgmt","TRACA3","Ray Deaton","Boiler & Machinery - 6 Locs."],
+["7/5/2026","Terra Nova Property Mgmt","MULTI1","Ray Deaton","Terrorism - 6 Locs."],
+["7/6/2026","First Capital Advisors, LLC","ALLIN5","Todd Sherrer","Property - Belcara Phase I, II & III"],
+["7/6/2026","First Capital Advisors, LLC","CENSU1","Todd Sherrer","General Liability - Belcara"],
+["7/6/2026","First Capital Advisors, LLC","CAPSP1","Todd Sherrer","Commercial Umbrella - Belcara"],
+["7/6/2026","ProdiGem LLC","ASSUR1","Ray Deaton","Commercial Flood - SR of Central"],
+["7/10/2026","OSA Group Investments","ILLUN1","Todd Sherrer","Property - $5M p/o $10M Primary Lead"],
+["7/10/2026","OSA Group Investments","TRAPR2","Todd Sherrer","Boiler & Machinery"],
+["7/10/2026","OSA Group Investments","MULTI1","Todd Sherrer","Terrorism PROP & GL"],
+["7/10/2026","OSA Group Investments","CONI10","Todd Sherrer","Property - TIV x/s of $10M"],
+["7/10/2026","OSA Group Investments","PALSP1","Todd Sherrer","Property - $5M p/o $10M"],
+["7/11/2026","TR3 Capital, LLC","WESWO1","Todd Sherrer","General Liability - Marbach Oaks"],
+["7/11/2026","TR3 Capital, LLC","WESWO1","Todd Sherrer","Commercial Umbrella - Marbach Oaks"],
+["7/16/2026","Manuel Cruz","STASU1","Todd Range","Property - Woodmont Plaza Ft Worth"],
+["7/24/2026","Leuven Group","ATESP2","Todd Sherrer","General Liability - Energy Lodges"],
+["7/24/2026","Leuven Group","MESUN1","Todd Sherrer","General Liability - AvenueOne 10"],
+["7/24/2026","Leuven Group","COVSP1","Todd Sherrer","General Liability - Energy Lodges Vacant"],
+["7/28/2026","Parker Lane Seniors, LP","WESWO1","Todd Sherrer","General Liability"],
+["7/28/2026","Parker Lane Seniors, LP","JAMRI1","Todd Sherrer","Commercial Umbrella"],
+["8/1/2026","Thomson Investments LLC G.P.","LANAM1","Ray Deaton","Property - Austin Woods & Barrington"],
+["8/1/2026","Thomson Investments LLC G.P.","TRACA3","Ray Deaton","Boiler & Machinery - Austin Woods"],
+["8/2/2026","Manuel Cruz","COVSP1","Todd Range","General Liability - Woodmont Plaza Fort Worth"],
+["8/4/2026","Manuel Cruz","AMHSP2","Todd Range","Property - Summer, Olmos, Hidden and Regency"],
+["8/11/2026","Westlake Condominiums HOA","GENST1","Todd Range","Property All Perils Excl Terrorism"],
+["8/15/2026","Leuven Group","UNIST1","Todd Sherrer","Equipment Floater"],
+["8/15/2026","Perry Reid Properties","AMHSP2","Todd Range","Property - Cozad, Haysville, Salina"],
+["8/15/2026","Perry Reid Properties","JAMRI1","Todd Range","General Liability - Lodge"],
+["8/15/2026","Perry Reid Properties","ACCSP1","Todd Range","General Liability - Haysville, Salina"],
+["8/15/2026","Perry Reid Properties","MIDIN5","Todd Range","Commercial Umbrella - Lodge at Lincoln"],
+["8/15/2026","Perry Reid Properties","MIDIN5","Todd Range","Commercial Umbrella - Haysville"],
+["8/19/2026","Crestmarc Real Estate Investments, LLC","NORIN2","Todd Range","General Liability - Due Diligence"],
+["8/20/2026","Castle Crown Property Management","AMHSP2","Todd Sherrer","Property - Asbury, Brentwood, Cedar Ridge"],
+["8/20/2026","Castle Crown Property Management","FORSP1","Todd Sherrer","General Liability - Asbury, Brentwood"],
+["8/20/2026","Castle Crown Property Management","MTHAW1","Todd Sherrer","Commercial Umbrella - Grove"],
+["8/20/2026","Castle Crown Property Management","WESSU2","Todd Sherrer","Commercial Umbrella - Asbury, Brentwood"],
+["8/28/2026","Primebridge Properties","TRAPR2","Ray Deaton","Business Auto"],
+["8/28/2026","Manuel Cruz","TRAPR2","Todd Range","Worker's Compensation - Summer Place only"],
+["8/31/2026","Westwind Enterprises, LTD","JAMRI1","Todd Range","General Liability - Scenic/Constellation"],
+["8/31/2026","Westwind Enterprises, LTD","MIDIN5","Todd Range","Commercial Umbrella - Scenic/Constellation"],
+["8/31/2026","Westwind Enterprises, LTD","STEIN1","Todd Range","Property - $10M 50% Primary Lead Scenic Vista"],
+["8/31/2026","Westwind Enterprises, LTD","ATESP2","Todd Range","XS Property 50% - $10M Primary Scenic Vista"],
+["8/31/2026","Westwind Enterprises, LTD","HOMIN2","Todd Range","Excess Property - XS $10M Scenic Vista"],
+["8/31/2026","Westwind Enterprises, LTD","TRACA3","Todd Range","Boiler & Machinery - Scenic/Constell/Spring Lake"],
+["9/3/2026","Quantum Capital, Inc","WRINA1","Todd Sherrer","Commercial Flood - 483 Laurel Lane"],
+["9/6/2026","Mark Hanson","ACCSU1","Todd Sherrer","Commercial Package - Townhollow Apts"],
+["9/8/2026","Leuven Group","CRU01","Todd Sherrer","General Liability - Solar Farm"],
+["9/8/2026","Leuven Group","BURIN1","Todd Sherrer","Property - Inland Marine - Solar Farm"],
+["9/10/2026","Willow Bend Community Apartments","AMHSP2","Ray Deaton","Property - Foxfire, Brushy Creek"],
+["9/10/2026","Willow Bend Community Apartments","COVSP1","Ray Deaton","General Liability - Brushy Creek"],
+["9/10/2026","Willow Bend Community Apartments","COVSP1","Ray Deaton","General Liability - Foxfire"],
+["9/10/2026","Willow Bend Community Apartments","ACCSP1","Ray Deaton","General Liability - Bluff Springs"],
+["9/10/2026","Willow Bend Community Apartments","HOMIN7","Ray Deaton","Commercial Umbrella - $5M"],
+["9/14/2026","Crestmarc Real Estate Investments, LLC","WESWO1","Todd Range","General Liability - Vacant Land"],
+["9/14/2026","ProdiGem LLC","ZURAM1","Ray Deaton","Employment Practices Liability"],
+["9/14/2026","Simpson Real Estate","AMHSP2","Todd Range","Property - Whisper Oaks"],
+["9/16/2026","Westwind Enterprises, LTD","MULTI1","Todd Range","Property - Bella Palazzo"],
+["9/16/2026","Westwind Enterprises, LTD","ACCSP1","Todd Range","General Liability - Bella Palazzo"],
+["9/16/2026","Westwind Enterprises, LTD","MIDIN5","Todd Range","Commercial Umbrella - Bella Palazzo"],
+["9/16/2026","Westwind Enterprises, LTD","TRAPR2","Todd Range","Boiler & Machinery - Bella Palazzo"],
+["9/16/2026","Westwind Enterprises, LTD","MULTI1","Todd Range","Terrorism - Bella Palazzo"],
+["9/19/2026","Hamid Ahwazi","ACCSU1","Todd Sherrer","Package - Apex fka Creekside"],
+["9/19/2026","Hamid Ahwazi","AMHSP2","Todd Sherrer","Property - Autumn Chase"],
+["9/19/2026","Hamid Ahwazi","CENSU1","Todd Sherrer","General Liability - Autumn Chase"],
+["9/19/2026","Hamid Ahwazi","CAPSP1","Todd Sherrer","Commercial Umbrella $5M"],
+["9/21/2026","First Capital Advisors, LLC","COVSP1","Todd Sherrer","Commercial Package - Banister"],
+["9/25/2026","Perry Reid Properties","STAIN4","Todd Range","Directors and Officers Liability"],
+["9/26/2026","Perry Reid Properties","STAIN4","Todd Range","Crime - Heritage Square"],
+["9/29/2026","Mountain Avenue Properties, LLC","ACCSU1","Todd Sherrer","Commercial Package - Sahara Suites"],
+["9/29/2026","Starpoint Properties","CENSU1","Todd Sherrer","General Liability - Legends"],
+["9/29/2026","Starpoint Properties","MIDIN5","Todd Sherrer","Commercial Umbrella - $10M - Rewrite"],
+["9/30/2026","Leuven Group","MULTI1","Todd Sherrer","Property - Tuscana, South Lake and ICON"],
+["9/30/2026","Leuven Group","GUINA1","Todd Sherrer","Property - Villas of Ocean Drive"],
+["9/30/2026","Leuven Group","MULTI1","Todd Sherrer","Property Terrorism - Tuscana"],
+["9/30/2026","Leuven Group","TRAPR2","Todd Sherrer","Boiler & Machinery - Corpus Locs"],
+["9/30/2026","Manuel Cruz","FEDIN1","Todd Range","Commercial Package - Woodlake Plaza"],
+["9/30/2026","Manuel Cruz","FEDIN1","Todd Range","Hired-Non-Owned Auto Liability - Woodlake"],
+["9/30/2026","Mountain Avenue Properties, LLC","ACCSU1","Todd Sherrer","Commercial Package - Tuscan"],
+["10/1/2026","Westwind Enterprises, LTD","HARNA1","Todd Range","Bond - MH Dealer Bond - Garden Valley MHC"],
+["10/1/2026","Davidson Properties Inc","AMHSP2","Todd Range","Property"],
+["10/1/2026","Davidson Properties Inc","WESWO1","Todd Range","General Liability - All Locs"],
+["10/1/2026","Davidson Properties Inc","WESWO1","Todd Range","Commercial Umbrella"],
+["10/1/2026","Manuel Cruz","TRASP1","Todd Range","General Liability - Summer, Olmos, Hidden"],
+["10/1/2026","Manuel Cruz","STANA1","Todd Range","Commercial Umbrella - PKGS/Woodmont/Woodlake"],
+["10/1/2026","Manuel Cruz","HUDEX1","Todd Range","Commercial Umbrella - Regency/Summer/Olmos"],
+["10/1/2026","Regional Investment and Management","WESWO1","Todd Range","General Liability - Salem Creek"],
+["10/1/2026","Regional Investment and Management","WESWO1","Todd Range","Commercial Umbrella - Salem"],
+["10/12/2026","Terralane Communities","ACCSP1","Todd Sherrer","General Liability"],
+["10/12/2026","Terralane Communities","STANA1","Todd Sherrer","Commercial Umbrella"],
+["10/16/2026","Crestmarc Redwood Carelton Holdings LLC","ASSUR1","Todd Range","Commercial Flood - 13 Bldgs"],
+["10/16/2026","Crestmarc Real Estate Investments, LLC","AMHSP2","Brent Guldahl","Property - Abbey Glenn RN"],
+["10/16/2026","Crestmarc Real Estate Investments, LLC","CENSU1","Brent Guldahl","General Liability - Abbey Glenn"],
+["10/16/2026","Crestmarc Real Estate Investments, LLC","MIDIN5","Brent Guldahl","Commercial Umbrella"],
+["10/18/2026","Simpson Real Estate","AMHSP2","Todd Range","Property - Banita Creek & Ponderosa Pines"],
+["11/5/2026","Gilbert Ave Townhome Association","ACEAM1","Agency House - CIS","General Liability"],
+["11/5/2026","Gilbert Ave Townhome Association","ACEAM1","Agency House - CIS","HNOA Policy"],
+["11/6/2026","Heritage Asset Management LLC","ASSUR1","Ray Deaton","Commercial Flood - Odessa Wildwood"],
+["11/6/2026","Heritage Asset Management LLC","MULTI1","Ray Deaton","Excess Flood - Odessa Wildwood"],
+["11/20/2026","Tamborello Investments, Inc.","STEIN1","Todd Range","Property - Northline Business"],
+["11/24/2026","Crestmarc Real Estate Investments, LLC","PHIIN2","Todd Range","General Liability - Overlook"],
+["11/24/2026","Crestmarc Real Estate Investments, LLC","THICO1","Todd Range","Property - Overlook - $10M Primary"],
+["11/24/2026","Crestmarc Real Estate Investments, LLC","PHIIN2","Todd Range","Commercial Umbrella - Overlook"],
+["11/24/2026","Crestmarc Real Estate Investments, LLC","HOMIN2","Todd Range","Property - Overlook - Excess"],
+["11/25/2026","Landmark Properties, Inc.","ZLLOYD","Todd Range","Property - Arden at Corinth"],
+["11/25/2026","Landmark Properties, Inc.","TRAPR1","Todd Range","Boiler & Machinery"],
+["11/25/2026","Leuven Group","SCOIN1","Todd Sherrer","General Liability - Aliso"],
+["11/25/2026","Leuven Group","NAUIN1","Todd Sherrer","Commercial Umbrella - Aliso"],
+["11/25/2026","Leuven Group","INDSP1","Todd Sherrer","Property - Aliso"],
+["11/25/2026","Leuven Group","ZLLOYD","Todd Sherrer","Terrorism - Property - Aliso"],
+["11/27/2026","J3 Home Services, LLC","CANUS1","DJ Drysdale Jr","General Liability"],
+["12/4/2026","Mark Hanson","ASSUR1","Todd Sherrer","Commercial Flood - 11 policies Terrain"],
+["12/4/2026","Guardstone Property Management","WRINA1","Todd Range","Commercial Flood - 5 Policies - Eldridge"],
+["12/5/2026","Phuong, Le FKA Phuong, Lisa","AMHSP2","Todd Sherrer","Property"],
+["12/5/2026","Phuong, Le FKA Phuong, Lisa","LIOSP1","Todd Sherrer","General Liability"],
+["12/5/2026","Phuong, Le FKA Phuong, Lisa","KININ1","Todd Sherrer","$3M Commercial Umbrella"],
+["12/14/2026","220 Overton Apartments Dallas, LLC","RICNA2","Todd Range","Commercial Umbrella - Overton Apts"],
+["12/14/2026","220 Overton Apartments Dallas, LLC","RICNA2","Todd Range","General Liability - Overton Apts"],
+["12/14/2026","7414 Clint Ln LLC","TRAI11","Agency House - CIS","General Liability"],
+["12/14/2026","7414 Clint Ln LLC","ATESP2","Agency House - CIS","Commercial Umbrella"],
+["12/14/2026","Equimax Management, LLC","GENST1","Todd Range","Property - Primary $5M"],
+["12/14/2026","Equimax Management, LLC","KININ1","Todd Range","General Liability - Hunters Glen"],
+["12/14/2026","Equimax Management, LLC","CLEBL3","Todd Range","General Liability - Silver Oaks"],
+["12/14/2026","Equimax Management, LLC","FEDIN1","Todd Range","Commercial Umbrella"],
+["12/14/2026","Equimax Management, LLC","TRAPR2","Todd Range","Boiler & Machinery"],
+["12/14/2026","Equimax Management, LLC","LANAM1","Todd Range","Property - $2.5M P/O $10M"],
+["12/14/2026","Equimax Management, LLC","MULTI1","Todd Range","Terrorism - PROP & GL"],
+["12/14/2026","Equimax Management, LLC","ILLIN1","Todd Range","Property - $2.5M P/O $10M"],
+["12/14/2026","Equimax Management, LLC","HOMIN2","Todd Range","Property - $40m X/S $10M"],
+["12/14/2026","OSA Group Investments","TRASP1","Todd Sherrer","General Liability - All Locations"],
+["12/14/2026","OSA Group Investments","ATESP2","Todd Sherrer","Commercial Umbrella - All Locations"],
+["12/14/2026","ProdiGem LLC","ASSUR1","Ray Deaton","Commercial Flood - 4 Bldgs SR of Central"],
+["12/14/2026","Regional Investment and Management","MOUVE1","Todd Range","General Liability - Riverstone 845"],
+["12/14/2026","Regional Investment and Management","MIDIN5","Todd Range","Commercial Umbrella - Riverstone $10M"],
+["12/14/2026","Tamborello Investments, Inc.","COVSP1","Todd Range","General Liability"],
+["12/14/2026","TR3 Capital, LLC","TRASP1","Todd Sherrer","General Liability - Mission at Medical"],
+["12/14/2026","TR3 Capital, LLC","ATESP2","Todd Sherrer","Commercial Umbrella - $2M - Mission at Medical"],
+["12/14/2026","TR3 Capital, LLC","SCOIN1","Todd Sherrer","Commercial Umbrella - $3M XS - Mission at Medical"],
+["12/14/2026","Vaquero Assets, LTD","TRASP1","Ray Deaton","General Liability"],
+["12/14/2026","Vaquero Assets, LTD","ATESP2","Ray Deaton","Commercial Umbrella $2M"],
+["12/15/2026","Westwind Enterprises, LTD","HARNA1","Todd Range","Bond MH Dealer - $50k - Princeton Village"],
+["12/15/2026","Westwind Enterprises, LTD","HARNA1","Todd Range","Bond MH Dealer - $50k - Forest Glen"],
+["12/15/2026","Westwind Enterprises, LTD","HARNA1","Todd Range","Bond - MH Dealer Bond - Breezy Oaks"],
+["12/15/2026","Westwind Enterprises, LTD","HARNA1","Todd Range","Bond - MH Dealer Bond - Kings Row"],
+["12/15/2026","Westwind Enterprises, LTD","HARNA1","Todd Range","Bond - MH Dealer Bond - Cedar Grove"],
+["12/15/2026","RNPH Properties, LLC","WESWO1","Todd Range","General Liability"],
+["12/15/2026","RNPH Properties, LLC","MIDIN5","Todd Range","Commercial Umbrella - $5M"],
+["12/16/2026","Crestmarc Redwood Carelton Holdings LLC","ASSUR1","Brent Guldahl","Commercial Flood - Univ Place"],
+["12/23/2026","CLVR Acquisitions, LLC","SELIN1","Todd Sherrer","Commercial Flood - 3 policies"],
+["12/30/2026","Austin PMA, LLC","ACEFI1","Todd Sherrer","Errors and Omissions & Cyber"],
+["12/30/2026","Austin PMA, LLC","SCOIN2","Todd Sherrer","Employment Practices Liability and D&O"],
+["12/31/2026","TR3 Capital, LLC","ZLLOYD","Todd Sherrer","Primary Property - $5M - Mission at Medical"],
+["12/31/2026","TR3 Capital, LLC","LANAM1","Todd Sherrer","Excess Property - Mission at Medical"],
+["12/31/2026","TR3 Capital, LLC","ZLLOYD","Todd Sherrer","Property Terrorism - Mission at Medical"],
+["12/31/2026","TR3 Capital, LLC","TRACA1","Todd Sherrer","Boiler & Machinery - Mission at Medical"],
+["1/2/2027","Manuel Cruz","TRACA3","Todd Range","Commercial Package - CVS Akron OH"],
+["1/5/2027","Leuven Group","SELIN1","Todd Sherrer","Commercial Flood - BLDG 3 - Arts on Ocean Drive"],
+["1/7/2027","Bailey Made LLC","NATFI1","DJ Drysdale Jr","Property"],
+["1/7/2027","Bailey Made LLC","CENIN1","DJ Drysdale Jr","General Liability"],
+["1/8/2027","Vaquero Assets, LTD","AMHSP2","Ray Deaton","Property"],
+["1/11/2027","Leuven Group","SELIN1","Todd Sherrer","Commercial Flood - Arts on Ocean Drive"],
+["1/13/2027","Leuven Group","WESSU2","Todd Sherrer","General Liability - The Arts at Ocean Drive"],
+["1/16/2027","Westwind Enterprises, LTD","TRAI11","Todd Range","General Liability - All CA MHPs"],
+["1/16/2027","Westwind Enterprises, LTD","SCOIN1","Todd Range","General Liability - AZ RV Park"],
+["1/16/2027","Westwind Enterprises, LTD","STEIN1","Todd Range","Commercial Package - AZ RV Park"],
+["1/16/2027","Westwind Enterprises, LTD","STEIN1","Todd Range","Commercial Package - TX Mobile Home Parks"],
+["1/16/2027","Westwind Enterprises, LTD","STEIN1","Todd Range","Commercial Package - OK Mobile Home Parks"],
+["1/16/2027","Westwind Enterprises, LTD","ATESP2","Todd Range","Commercial Umbrella - $2M 1st Layer MHC"],
+["1/16/2027","Westwind Enterprises, LTD","LEXIN1","Todd Range","Commercial Umbrella - $3M XS MHC Parks"],
+["1/16/2027","Westwind Enterprises, LTD","TRAPR2","Todd Range","Boiler & Machinery - CA Mobile Home Parks"],
+["1/16/2027","Westwind Enterprises, LTD","MULTI1","Todd Range","Property and GL Terrorism - MHCs"],
+["1/17/2027","Westwind Enterprises, LTD","HARIN6","Todd Range","Commercial Flood - Kings Row Only"],
+["1/18/2027","Leuven Group","WESIN2","Todd Sherrer","Commercial Package - Medwest"],
+["1/23/2027","ProdiGem LLC","TEXMU2","Ray Deaton","Worker's Compensation - 222 Lee Lane"],
+["1/24/2027","Westwind Enterprises, LTD","TRACA3","Todd Range","Crime - Bella Palazzo"],
+["1/25/2027","First Capital Advisors, LLC","MIDIN5","Todd Sherrer","Commercial Umbrella - The Oaks"],
+["1/25/2027","First Capital Advisors, LLC","MIDIN5","Todd Sherrer","Commercial Umbrella - Vines at Turtle Creek"],
+["1/25/2027","First Capital Advisors, LLC","KININ1","Todd Sherrer","General Liability - Vines at Turtle Creek"],
+["1/25/2027","First Capital Advisors, LLC","CENSU1","Todd Sherrer","General Liability - The Oaks"],
+["1/27/2027","Home Recreation LLC","MAXIN1","DJ Drysdale Jr","General Liability"],
+["1/27/2027","Home Recreation LLC","SCOIN1","DJ Drysdale Jr","Commercial Umbrella"],
+["1/28/2027","Home Recreation LLC","TEXMU2","DJ Drysdale Jr","Workers Compensation"],
+["1/28/2027","Home Recreation LLC","PROCO4","DJ Drysdale Jr","Business Auto"],
+["2/1/2027","RanchlandMTX, LLC","ASSUR1","Todd Sherrer","Commercial Flood - 10 Policies"],
+["2/3/2027","Bellator Builders & Development LLC","TEXMU2","DJ Drysdale Jr","Workers Compensation - TX"],
+["2/3/2027","Bellator Builders & Development LLC","ARGIN1","DJ Drysdale Jr","Workers Compensation - OK"],
+["2/3/2027","Leuven Group","SELIN1","Todd Sherrer","Commercial Flood - BLDG 5-B - Arts on Ocean"],
+["2/4/2027","Leuven Group","SELIN1","Todd Sherrer","Commercial Flood - BLDG 5 - Arts on Ocean"],
+["2/6/2027","Westwind Enterprises, LTD","SCOIN1","Todd Range","Property - CA MHPs/Lake Perris"],
+["2/15/2027","CM Cuadra CO - Trustees","MIDIN5","Todd Sherrer","Commercial Umbrella $5M"],
+["2/15/2027","CM Cuadra CO - Trustees","STEIN1","Todd Sherrer","Property - $5M p/o $10M Primary LEAD"],
+["2/15/2027","CM Cuadra CO - Trustees","JAMRI1","Todd Sherrer","General Liability"],
+["2/15/2027","CM Cuadra CO - Trustees","AXISU1","Todd Sherrer","Property - $5M p/o $10M Primary"],
+["2/18/2027","First Capital Advisors, LLC","MIDIN5","Todd Sherrer","Commercial Umbrella - Jade Residences"],
+["2/18/2027","First Capital Advisors, LLC","ACCSP2","Todd Sherrer","Commercial Package - Jade Residences"],
+["2/18/2027","Silver Spring at Forney, LP","PROCO1","Todd Sherrer","Business Auto"],
+["3/1/2027","220 Overton Apartments Dallas, LLC","GENST1","Todd Range","Property - Overton Park Apartments"],
+["3/1/2027","220 Overton Apartments Dallas, LLC","TRAPR2","Todd Range","Boiler & Machinery"],
+["3/1/2027","7414 Clint Ln LLC","LANAM1","Agency House - CIS","Property"],
+["3/1/2027","Calton Investments, Inc.","STEIN1","Todd Sherrer","Property $5M p/o $10M Primary Lead"],
+["3/1/2027","Calton Investments, Inc.","PALSP1","Todd Sherrer","Property $5M p/o $10M Primary"],
+["3/1/2027","Calton Investments, Inc.","KININ1","Todd Sherrer","Property $10M x/s of $10M"],
+["3/1/2027","Landmark Properties, Inc.","ACCSP1","Todd Range","General Liability - Rendon"],
+["3/1/2027","Landmark Properties, Inc.","ASPSP1","Todd Range","Property - Rendon - $25M Primary"],
+["3/1/2027","Landmark Properties, Inc.","WESWO1","Todd Range","Commercial Umbrella - Rendon"],
+["3/1/2027","Landmark Properties, Inc.","TRAPR1","Todd Range","Boiler & Machinery - Rendon"],
+["3/1/2027","Landmark Properties, Inc.","ZLLOYD","Todd Range","Property Terrorism - Rendon"],
+["3/1/2027","Landmark Properties, Inc.","HOMIN2","Todd Range","Property - Rendon - Excess"],
+["3/1/2027","Lamesa Housing, Inc","WESWO1","Ray Deaton","Commercial Umbrella - $3M"],
+["3/1/2027","Lamesa Housing, Inc","WESWO1","Ray Deaton","General Liability"],
+["3/1/2027","Lamesa Housing, Inc","MULTI1","Ray Deaton","WDBB - from 5% to $50K"],
+["3/1/2027","Lamesa Housing, Inc","MULTI1","Ray Deaton","Property"],
+["3/1/2027","Quilloy Management Company, LLC","LANAM1","Todd Sherrer","Property"],
+["3/1/2027","RanchlandMTX, LLC","MIDIN5","Todd Sherrer","Commercial Umbrella - $5M"],
+["3/1/2027","RanchlandMTX, LLC","WESWO1","Todd Sherrer","General Liability - Ranchland"],
+["3/1/2027","RanchlandMTX, LLC","AMHSP2","Todd Sherrer","Property - Ranchland"],
+["3/1/2027","Regional Investment and Management","LANAM1","Todd Range","Property - Salem"],
+["3/1/2027","RNPH Properties, LLC","LANAM1","Todd Range","Property"],
+["3/1/2027","The Lakeview at White Rock LLC","CUMIN1","DJ Drysdale Jr","Property"],
+["3/1/2027","The Lakeview at White Rock LLC","ZLLOYD","DJ Drysdale Jr","Property Terrorism"],
+["3/1/2027","Thomson Investments LLC G.P.","LANAM1","Ray Deaton","Property - Town View"],
+["3/1/2027","Thomson Investments LLC G.P.","WESWO1","Ray Deaton","General Liability - Austin Woods"],
+["3/1/2027","Thomson Investments LLC G.P.","WESWO1","Ray Deaton","General Liability - Town View"],
+["3/1/2027","Thomson Investments LLC G.P.","WESWO1","Ray Deaton","Commercial Umbrella - Austin Woods"],
+["3/1/2027","Thomson Investments LLC G.P.","WESWO1","Ray Deaton","Commercial Umbrella - Town View"],
+["3/1/2027","Southern Hills Partners, LLC","AMHSP2","Todd Range","Property - Southern Hills"],
+["3/9/2027","The Lakeview at White Rock LLC","ACCSP1","DJ Drysdale Jr","General Liability"],
+["3/9/2027","The Lakeview at White Rock LLC","CAPSP1","DJ Drysdale Jr","Commercial Umbrella"],
+["3/10/2027","Manuel Cruz","ACEIN1","Todd Range","Commercial Package - Dollar Tree"],
+["3/11/2027","Perry Reid Properties","ATESP2","Todd Range","Property - KS and NE"],
+["3/11/2027","Perry Reid Properties","ACCSP1","Todd Range","General Liability - KS and NE"],
+["3/11/2027","Perry Reid Properties","JAMRI1","Todd Range","Commercial Umbrella - KS and NE"],
+["3/11/2027","Perry Reid Properties","ZLLOYD","Todd Range","Property Terrorism - KS and NE"],
+["3/11/2027","Perry Reid Properties","TRAPR1","Todd Range","Boiler & Machinery - KS and NE"],
+["3/12/2027","West Winds Village Apartments, LLC","MIDIN5","Todd Sherrer","Commercial Umbrella"]
+];
+
+function buildData() {
+  policies = [];
+  accounts = {};
+  for (var i = 0; i < RAW.length; i++) {
+    var r = RAW[i];
+    var exp = new Date(r[0]);
+    exp.setHours(0,0,0,0);
+    var days = isNaN(exp) ? null : Math.round((exp - today) / 86400000);
+    var pol = {id:i, accountName:r[1], issuingCompany:r[2], advisor:r[3], description:r[4], expDate:exp, daysUntil:days, premium:'', docuSign:'', submitted:'', epicBilled:'', certsLender:'', binder:'', policySent:'', quoteGL:'', quoteProp:'', quoteUmb:'', quoteWC:'', quoteFlood:'', quoteBond:''};
+    policies.push(pol);
+    if (!accounts[r[1]]) accounts[r[1]] = {name:r[1], advisor:r[3], status:'', followupLog:[], policies:[]};
+    accounts[r[1]].policies.push(pol);
   }
+}
 
+function isTruthy(v) {
+  if (!v) return false;
+  var s = v.toString().toLowerCase().trim();
+  return s==='yes'||s==='y'||s==='1'||s==='x'||s==='true'||s==='sent'||s==='done'||s==='complete'||s==='submitted'||s==='received';
+}
+
+// Per-card (account + dateKey) completion check
+function cardChecksComplete(a,dateKey) {
+  // get policies belonging to this card's dateKey
+  var pols=[];
+  for(var i=0;i<a.policies.length;i++){
+    var pd=a.policies[i].expDate&&!isNaN(a.policies[i].expDate)?a.policies[i].expDate.toDateString():'';
+    if(pd===dateKey)pols.push(a.policies[i]);
+  }
+  if(!pols.length)return false;
+  for(var i=0;i<pols.length;i++){
+    for(var j=0;j<CHK.length;j++){if(!isTruthy(pols[i][CHK[j].k]))return false;}
+  }
+  return true;
+}
+function isCardComplete(a,dateKey) {
+  return getCardStatus(a,dateKey)==='Bound' && cardChecksComplete(a,dateKey);
+}
+// Account-level helpers
+function isCompleted(a) {
+  // An account is fully complete only if EVERY date card is complete
+  if(!a.policies||!a.policies.length)return false;
+  var byDate={};
+  for(var i=0;i<a.policies.length;i++){var p=a.policies[i];var dk=p.expDate&&!isNaN(p.expDate)?p.expDate.toDateString():'';if(!byDate[dk])byDate[dk]=true;}
+  var dks=Object.keys(byDate);
+  for(var i=0;i<dks.length;i++){if(!isCardComplete(a,dks[i]))return false;}
+  return true;
+}
+function isCancelled(a) {
+  // Account-level cancelled only if set directly with no per-card statuses (old single-card accounts)
+  if((!a.dateStatuses||Object.keys(a.dateStatuses).length===0)&&(a.status||'').toLowerCase()==='cancelled')return true;
+  return false;
+}
+function isActive(a) { return !isCancelled(a); }
+function isDateBound(a,dateKey) { return a.boundDates&&a.boundDates.indexOf(dateKey)>=0; }
+
+function acctMinDays(a) {
+  var min=null;
+  for (var i=0;i<a.policies.length;i++) { var n=a.policies[i].daysUntil; if(n!==null&&(min===null||n<min))min=n; }
+  return min;
+}
+
+function acctUrgClass(a) {
+  var n=acctMinDays(a);
+  if(n===null)return''; if(n<0)return'past'; if(n<=30)return'red'; if(n<=60)return'yellow'; return'green';
+}
+
+function isRelevantQuote(desc,field) {
+  var d=(desc||'').toLowerCase();
+  if(field==='quoteGL')return d.indexOf('liability')>=0;
+  if(field==='quoteProp')return d.indexOf('property')>=0&&d.indexOf('terrorism')<0;
+  if(field==='quoteUmb')return d.indexOf('umbrella')>=0;
+  if(field==='quoteWC')return d.indexOf('worker')>=0||d.indexOf('comp')>=0;
+  if(field==='quoteFlood')return d.indexOf('flood')>=0;
+  if(field==='quoteBond')return d.indexOf('bond')>=0;
+  return false;
+}
+
+function checkToddRule(pol,acct) {
+  var pdate=pol.expDate&&!isNaN(pol.expDate)?pol.expDate.toDateString():'';
+  if(isCardComplete(acct,pdate))return false;
+  var adv=(pol.advisor||acct.advisor||'').trim().toLowerCase();
+  var desc=(pol.description||'').toLowerCase();
+  var carrier=(pol.issuingCompany||'').trim().toLowerCase();
+  var days=pol.daysUntil;
+  return adv==='todd range'&&desc.indexOf('property')>=0&&desc.indexOf('terrorism')<0&&carrier!=='riskthe-01'&&days!==null&&days>=0&&days<=60;
+}
+
+function fireRulesOnPolicy(pol,acct) {
+  // Never suppress rules based on account-level status — check per-card only
+  var pdate=pol.expDate&&!isNaN(pol.expDate)?pol.expDate.toDateString():'';
+  if(isCardComplete(acct,pdate))return[];
+  // Get the card's current status dropdown value
+  var cardSt=(getCardStatus(acct,pdate)||'').toLowerCase();
+  // Statuses that mean work is underway — suppress "not yet submitted" type escalations
+  var workingStatuses=['in progress','submitted','quoted','proposed','bound','non-renewal','rewrite'];
+  var isWorking=workingStatuses.indexOf(cardSt)>=0;
+  var alerts=[];
+  if(checkToddRule(pol,acct)) alerts.push({msg:'Submit property quote to RISKTHE-01',severity:'warn',polId:pol.id,desc:pol.description});
+  for(var i=0;i<rules.length;i++) {
+    var r=rules[i];
+    if(!r.on)continue;
+    if(r.daysCond==='lte'&&(pol.daysUntil===null||pol.daysUntil>r.daysVal))continue;
+    if(r.daysCond==='gte'&&(pol.daysUntil===null||pol.daysUntil<r.daysVal))continue;
+    // Suppress "not yet submitted" escalation if card status shows work is underway
+    if(r.op==='notChecked'&&r.field==='submitted'&&isWorking)continue;
+    // Suppress "policy not sent" alert if card is not yet Bound (policy can't be sent before binding)
+    // and suppress it once policySent checkbox is checked (handled below via isTruthy)
+    // But if card status is NOT Bound, "Follow up — send policy" isn't actionable yet — skip it
+    if(r.op==='notChecked'&&r.field==='policySent'&&cardSt!=='bound')continue;
+    var fv=(pol[r.field]||'').toString().toLowerCase();
+    var match=false;
+    if(r.op==='contains'&&fv.indexOf((r.val||'').toLowerCase())>=0)match=true;
+    if(r.op==='notChecked'&&!isTruthy(pol[r.field]))match=true;
+    if(r.op==='isNot'&&fv!==(r.val||'').toLowerCase())match=true;
+    if(match)alerts.push({msg:r.msg,severity:r.severity,polId:pol.id,desc:pol.description});
+  }
+  return alerts;
+}
+
+function fireRulesOnAccount(acct) {
+  var all=[];
+  for(var i=0;i<acct.policies.length;i++) { var a=fireRulesOnPolicy(acct.policies[i],acct); for(var j=0;j<a.length;j++)all.push(a[j]); }
+  return all;
+}
+
+// Repair accounts where account-level status was set by the old bug.
+// The old code set a.status='Bound' or a.status='Cancelled' on the whole account
+// when only one date card was bound/cancelled. This hides all remaining cards.
+// Fix: if the account has per-card dateStatuses, the account-level status should be '' —
+// each card manages its own status independently.
+function repairAccountStatuses() {
+  var ns=Object.keys(accounts);
+  for(var i=0;i<ns.length;i++){
+    var a=accounts[ns[i]];
+    if(!a)continue;
+    var st=(a.status||'').toLowerCase();
+    var hasPerCardStatuses=a.dateStatuses&&Object.keys(a.dateStatuses).length>0;
+    // If account-level status is Bound or Cancelled BUT there are per-card statuses,
+    // the account-level status was set by the old bug — clear it
+    if((st==='bound'||st==='cancelled')&&hasPerCardStatuses){
+      a.status='';
+    }
+  }
+}
+
+function loadSaved() {
   try {
-
-    // ── ping ────────────────────────────────────────────────────────────────
-    if (action === 'ping') {
-      return respond({ ok: true, message: 'KCM Tracker Apps Script is running.' });
+    var rs=localStorage.getItem(SK);
+    if(rs) {
+      var ed=JSON.parse(rs);
+      if(ed.policies) { for(var i=0;i<policies.length;i++){var s=ed.policies[policies[i].id];if(s)Object.assign(policies[i],s);} }
+      if(ed.accounts) { var ns=Object.keys(ed.accounts); for(var i=0;i<ns.length;i++){var n=ns[i];if(accounts[n]){var lsSt=ed.accounts[n].status||'';var lsDs=ed.accounts[n].dateStatuses||{};if(lsSt.toLowerCase()==='bound'&&Object.keys(lsDs).length>0)lsSt='';Object.assign(accounts[n],{status:lsSt,boundCarrier:ed.accounts[n].boundCarrier||'',boundPremium:ed.accounts[n].boundPremium||'',boundDates:ed.accounts[n].boundDates||[],dateStatuses:lsDs,followupLog:ed.accounts[n].followupLog||[],dateNotes:ed.accounts[n].dateNotes||{}});}} }
     }
-
-    // ── load ────────────────────────────────────────────────────────────────
-    if (action === 'load') {
-      return respond(loadData());
-    }
-
-    // ── saveField  (small value — fits in one GET) ───────────────────────────
-    if (action === 'saveField') {
-      var field    = params.field;
-      var data     = params.data;
-      var syncedAt = params.syncedAt || new Date().toISOString();
-      if (!field || data === undefined)
-        return respond({ ok: false, error: 'Missing field or data' });
-      writeField(field, data, syncedAt);
-      return respond({ ok: true });
-    }
-
-    // ── chunkField  (store one chunk row in the sheet) ───────────────────────
-    if (action === 'chunkField') {
-      var session = params.session;
-      var idx     = params.idx;
-      var data    = params.data;
-      if (!session || idx === undefined || data === undefined)
-        return respond({ ok: false, error: 'Missing chunk params' });
-      writeChunk(session, parseInt(idx, 10), data);
-      return respond({ ok: true });
-    }
-
-    // ── assembleField  (join sheet chunk rows → write field → delete chunks) ─
-    if (action === 'assembleField') {
-      var session  = params.session;
-      var field    = params.field;
-      var total    = parseInt(params.total, 10);
-      var syncedAt = params.syncedAt || new Date().toISOString();
-      if (!session || !field || !total)
-        return respond({ ok: false, error: 'Missing assemble params' });
-      var assembled = readAndDeleteChunks(session, total);
-      if (assembled === null)
-        return respond({ ok: false, error: 'Missing one or more chunks in sheet' });
-      writeField(field, assembled, syncedAt);
-      return respond({ ok: true });
-    }
-
-    // ── clearChunks  (delete any leftover chunk rows) ───────────────────────
-    if (action === 'clearChunks') {
-      var n = deleteAllChunkRows();
-      return respond({ ok: true, deleted: n });
-    }
-
-    return respond({ ok: false, error: 'Unknown action: ' + action });
-
-  } catch (err) {
-    return respond({ ok: false, error: err.toString() });
-  }
+    var nb=localStorage.getItem(SK_NB); if(nb)newBiz=JSON.parse(nb);
+    var rl=localStorage.getItem(SK_RULES);
+    if(rl) {
+      var sv=JSON.parse(rl); rules=[];
+      for(var i=0;i<DEFAULT_RULES.length;i++){var found=null;for(var j=0;j<sv.length;j++){if(sv[j].id===DEFAULT_RULES[i].id){found=sv[j];break;}}var rc={};for(var k in DEFAULT_RULES[i])rc[k]=DEFAULT_RULES[i][k];if(found)rc.on=found.on;rules.push(rc);}
+      for(var i=0;i<sv.length;i++){var isD=false;for(var j=0;j<DEFAULT_RULES.length;j++){if(DEFAULT_RULES[j].id===sv[i].id){isD=true;break;}}if(!isD)rules.push(sv[i]);}
+    } else { rules=[]; for(var i=0;i<DEFAULT_RULES.length;i++)rules.push(DEFAULT_RULES[i]); }
+  } catch(e){console.warn(e);rules=[];for(var i=0;i<DEFAULT_RULES.length;i++)rules.push(DEFAULT_RULES[i]);}
 }
 
-// ── Sheet helpers ────────────────────────────────────────────────────────────
-
-function getSheet() {
-  var ss    = SpreadsheetApp.getActiveSpreadsheet();
-  var sheet = ss.getSheetByName('KCM_Data');
-  if (!sheet) {
-    sheet = ss.insertSheet('KCM_Data');
-    sheet.appendRow(['field', 'value', 'updatedAt']);
-  }
-  return sheet;
+function saveAll() {
+  try {
+    var pd={};
+    for(var i=0;i<policies.length;i++){var p=policies[i];pd[p.id]={premium:p.premium||'',boundCarrier:p.boundCarrier||'',boundPremium:p.boundPremium||'',docuSign:p.docuSign,submitted:p.submitted,epicBilled:p.epicBilled,certsLender:p.certsLender,binder:p.binder,policySent:p.policySent,quoteGL:p.quoteGL,quoteProp:p.quoteProp,quoteUmb:p.quoteUmb,quoteWC:p.quoteWC,quoteFlood:p.quoteFlood,quoteBond:p.quoteBond};}
+    var ad={};var ns=Object.keys(accounts);for(var i=0;i<ns.length;i++){var n=ns[i];ad[n]={status:accounts[n].status,boundCarrier:accounts[n].boundCarrier||'',boundPremium:accounts[n].boundPremium||'',boundDates:accounts[n].boundDates||[],dateStatuses:accounts[n].dateStatuses||{},followupLog:accounts[n].followupLog||[],dateNotes:accounts[n].dateNotes||{}};}
+    localStorage.setItem(SK,JSON.stringify({policies:pd,accounts:ad}));
+    localStorage.setItem(SK_NB,JSON.stringify(newBiz));
+    localStorage.setItem(SK_RULES,JSON.stringify(rules));
+    var t=document.getElementById('savedTag');t.style.display='inline-block';setTimeout(function(){t.style.display='none';},2500);
+  } catch(e){alert('Save failed: '+e.message);}
 }
 
-// Write or update a named field row
-function writeField(field, value, syncedAt) {
-  var sheet   = getSheet();
-  var lastRow = sheet.getLastRow();
-  for (var r = 1; r <= lastRow; r++) {
-    if (sheet.getRange(r, 1).getValue() === field) {
-      sheet.getRange(r, 2).setValue(value);
-      sheet.getRange(r, 3).setValue(syncedAt);
+// ── Cloud Sync (Google Apps Script) ─────────────────────────────────────────
+var SK_SYNC='kcm_sync_cfg';
+var GAS_URL='https://script.google.com/macros/s/AKfycbx6pgayZ4iYrgClU6x99x9Xs2BYNVSwm7L-OCi_VGLzt3J59AN5WpQh_nVJRSjfdbD7/exec';
+function getSyncCfg(){try{return JSON.parse(localStorage.getItem(SK_SYNC)||'{}');}catch(e){return {};}}
+function getSyncUrl(){var cfg=getSyncCfg();return cfg.url||GAS_URL;}
+function saveSyncConfig(){
+  var url=document.getElementById('syncBinId').value.trim();
+  if(!url){document.getElementById('syncStatus').innerHTML='<span style="color:var(--red)">Please enter the Apps Script URL.</span>';return;}
+  localStorage.setItem(SK_SYNC,JSON.stringify({url:url}));
+  document.getElementById('syncStatus').innerHTML='<span style="color:var(--green-dark)">✔ Settings saved!</span>';
+  setTimeout(closeSyncConfig,1000);
+}
+function openSyncConfig(){
+  var cfg=getSyncCfg();
+  document.getElementById('syncBinId').value=cfg.url||GAS_URL;
+  document.getElementById('syncStatus').innerHTML='';
+  document.getElementById('syncOverlay').classList.remove('hidden');
+}
+function closeSyncConfig(){document.getElementById('syncOverlay').classList.add('hidden');}
+
+function getSyncPayload(){
+  var pd={};
+  for(var i=0;i<policies.length;i++){var p=policies[i];pd[p.id]={premium:p.premium||'',boundCarrier:p.boundCarrier||'',boundPremium:p.boundPremium||'',docuSign:p.docuSign,submitted:p.submitted,epicBilled:p.epicBilled,certsLender:p.certsLender,binder:p.binder,policySent:p.policySent,quoteGL:p.quoteGL,quoteProp:p.quoteProp,quoteUmb:p.quoteUmb,quoteWC:p.quoteWC,quoteFlood:p.quoteFlood,quoteBond:p.quoteBond};}
+  var ad={};var ns=Object.keys(accounts);
+  for(var i=0;i<ns.length;i++){var n=ns[i];ad[n]={status:accounts[n].status,boundCarrier:accounts[n].boundCarrier||'',boundPremium:accounts[n].boundPremium||'',boundDates:accounts[n].boundDates||[],dateStatuses:accounts[n].dateStatuses||{},followupLog:accounts[n].followupLog||[],dateNotes:accounts[n].dateNotes||{}};}
+  return {policies:pd,accounts:ad,newBiz:JSON.stringify(newBiz),rules:JSON.stringify(rules),syncedAt:new Date().toISOString()};
+}
+
+function showSyncTag(msg,color){
+  var t=document.getElementById('syncTag');
+  t.textContent=msg;t.style.color=color||'#1a6fa8';t.style.display='inline-block';
+  setTimeout(function(){t.style.display='none';},4000);
+}
+function setSyncBtnState(loading){
+  document.getElementById('syncPushBtn').disabled=loading;
+  document.getElementById('syncPullBtn').disabled=loading;
+}
+
+function gasCall(url,params,cb){
+  // Use JSONP via script tag to avoid CORS issues with Google Apps Script
+  var cbName='_gas_cb_'+Date.now()+'_'+Math.floor(Math.random()*9999);
+  var timer=setTimeout(function(){
+    window[cbName]=null;if(s&&s.parentNode)s.parentNode.removeChild(s);
+    cb({ok:false,error:'Timeout — check your Apps Script deployment'});
+  },60000);
+  window[cbName]=function(d){
+    clearTimeout(timer);window[cbName]=null;if(s&&s.parentNode)s.parentNode.removeChild(s);cb(d);
+  };
+  params.callback=cbName;
+  var qs=Object.keys(params).map(function(k){return encodeURIComponent(k)+'='+encodeURIComponent(params[k]);}).join('&');
+  var s=document.createElement('script');s.src=url+'?'+qs;
+  s.onerror=function(){clearTimeout(timer);window[cbName]=null;cb({ok:false,error:'Script load failed — check Apps Script URL'});};
+  document.head.appendChild(s);
+}
+function gasGet(url,params,cb){gasCall(url,params,cb);}
+
+// gasPost kept as alias for gasGet (CORS blocks real POST to Apps Script)
+function gasPost(url,params,cb){gasGet(url,params,cb);}
+
+function testSyncConnection(){
+  var url=document.getElementById('syncBinId').value.trim()||getSyncUrl();
+  var el=document.getElementById('syncStatus');
+  el.innerHTML='<span style="color:#1a6fa8">⏳ Step 1/2: Pinging Apps Script…</span>';
+  gasGet(url,{action:'ping'},function(d){
+    if(!d.ok){el.innerHTML='<span style="color:var(--red)">❌ Ping failed: '+(d.error||'no response')+'<br>Check that your Apps Script is deployed as "Anyone" (web app).</span>';return;}
+    el.innerHTML='<span style="color:#1a6fa8">⏳ Step 2/2: Testing read (load)…</span>';
+    gasGet(url,{action:'load'},function(d3){
+      if(!d3.ok){el.innerHTML='<span style="color:var(--red)">❌ Read test failed: '+(d3.error||'load error')+'</span>';return;}
+      var hasPolicies=d3.data&&d3.data.policies;
+      el.innerHTML='<span style="color:var(--green-dark)">✅ Connected! '+(hasPolicies?'Saved data found in Google Sheets.':'No data yet — Push to store your data.')+'</span>';
+    });
+  });
+}
+
+function syncPush(){
+  var url=getSyncUrl();
+  setSyncBtnState(true);
+  showSyncTag('Clearing old data…','#1a6fa8');
+  // Always clear leftover chunk rows in the sheet before pushing
+  gasGet(url,{action:'clearChunks'},function(){
+    doPush();
+  });
+}
+function doPush(){
+  var url=getSyncUrl();
+  var payload=getSyncPayload();
+  var fields=['policies','accounts','newBiz','rules'];
+  var fieldIdx=0;
+  // Safe URL limit for JSONP script tag GET requests
+  var GET_LIMIT=6000;
+  // Raw JSON chars per chunk. Typical JSON expands ~1.5x with encodeURIComponent.
+  // 5000 raw × 1.5 = 7500 encoded + ~300 base URL = ~7800. Google allows ~8000. Safe.
+  var CHUNK_B64=5000;
+
+  function sendField(){
+    if(fieldIdx>=fields.length){
+      setSyncBtnState(false);
+      showSyncTag('☁️ Pushed! '+new Date().toLocaleTimeString(),'#1a6fa8');
       return;
     }
-  }
-  sheet.appendRow([field, value, syncedAt]);
-}
+    var key=fields[fieldIdx];
+    var val=typeof payload[key]==='string'?payload[key]:JSON.stringify(payload[key]);
+    showSyncTag('Pushing '+key+'…','#1a6fa8');
 
-// Store a chunk as a row: field='__chunk__<session>__<idx>'
-function writeChunk(session, idx, data) {
-  var sheet = getSheet();
-  var key   = '__chunk__' + session + '__' + idx;
-  var lastRow = sheet.getLastRow();
-  for (var r = 1; r <= lastRow; r++) {
-    if (sheet.getRange(r, 1).getValue() === key) {
-      sheet.getRange(r, 2).setValue(data);
-      return;
+    // Try direct saveField GET first (small fields)
+    var testQs=url+'?action=saveField&field='+encodeURIComponent(key)+'&syncedAt='+encodeURIComponent(payload.syncedAt||'')+'&data='+encodeURIComponent(val);
+    var done=function(d){
+      if(!d.ok){setSyncBtnState(false);showSyncTag('Push error on '+key+': '+(d.error||'failed'),'var(--red)');return;}
+      fieldIdx++;sendField();
+    };
+
+    if(testQs.length<=GET_LIMIT){
+      gasGet(url,{action:'saveField',field:key,data:val,syncedAt:payload.syncedAt||''},done);
+    } else {
+      // Large field — chunk raw JSON into pieces small enough for URL encoding
+      (function(){
+        var session=Date.now().toString(36)+'_'+key;
+        var chunks=[];
+        for(var i=0;i<val.length;i+=CHUNK_B64)chunks.push(val.substring(i,i+CHUNK_B64));
+        var total=chunks.length;
+        var ci=0;
+        function sendChunk(){
+          if(ci>=total){
+            gasGet(url,{action:'assembleField',field:key,session:session,total:String(total),syncedAt:payload.syncedAt||''},function(d){
+              if(!d.ok){setSyncBtnState(false);showSyncTag('Push error on '+key+': '+(d.error||'failed'),'var(--red)');return;}
+              fieldIdx++;sendField();
+            });
+            return;
+          }
+          showSyncTag('Pushing '+key+' '+(ci+1)+'/'+total+'…','#1a6fa8');
+          gasGet(url,{action:'chunkField',session:session,idx:String(ci),data:chunks[ci]},function(d){
+            if(!d.ok){setSyncBtnState(false);showSyncTag('Push error on '+key+' chunk '+(ci+1)+': '+(d.error||'failed'),'var(--red)');return;}
+            ci++;setTimeout(sendChunk,200);
+          });
+        }
+        sendChunk();
+      })();
     }
   }
-  sheet.appendRow([key, data, '']);
+  sendField();
 }
 
-// Read chunks 0..total-1, delete their rows, return assembled string (or null on missing)
-function readAndDeleteChunks(session, total) {
-  var sheet   = getSheet();
-  var lastRow = sheet.getLastRow();
-  // Build a map: idx → row number
-  var rowMap  = {};
-  var prefix  = '__chunk__' + session + '__';
-  for (var r = 1; r <= lastRow; r++) {
-    var key = sheet.getRange(r, 1).getValue();
-    if (key.indexOf(prefix) === 0) {
-      var idx = parseInt(key.substring(prefix.length), 10);
-      rowMap[idx] = r;
+function applyCloudData(rec){
+  // Apply pulled policy data by ID — works even if policies were loaded from Excel
+  var pd=typeof rec.policies==='string'?JSON.parse(rec.policies):rec.policies;
+  var ad=typeof rec.accounts==='string'?JSON.parse(rec.accounts):rec.accounts;
+  if(pd){
+    // Build a lookup by policy id for fast matching
+    var pdById={};var pdKeys=Object.keys(pd);
+    for(var i=0;i<pdKeys.length;i++)pdById[pdKeys[i]]=pd[pdKeys[i]];
+    for(var i=0;i<policies.length;i++){var ps=pdById[policies[i].id];if(ps)Object.assign(policies[i],ps);}
+  }
+  if(ad){
+    var ns=Object.keys(ad);
+    for(var i=0;i<ns.length;i++){
+      var n=ns[i];
+      var src=ad[n];
+      var acctSt=src.status||'';
+      var acctDs=src.dateStatuses||{};
+      if(acctSt.toLowerCase()==='bound'&&Object.keys(acctDs).length>0)acctSt='';
+      var merged={status:acctSt,boundCarrier:src.boundCarrier||'',boundPremium:src.boundPremium||'',boundDates:src.boundDates||[],dateStatuses:acctDs,followupLog:src.followupLog||[],dateNotes:src.dateNotes||{}};
+      if(accounts[n]){
+        // Account exists — merge cloud data over local
+        Object.assign(accounts[n],merged);
+      }
+      // If account doesn't exist in memory (Excel not uploaded on this browser),
+      // the status/statuses are stored and will apply when Excel is uploaded next.
+      // We can't create a full account without the policy list — that comes from Excel.
+      // So store the cloud account data in a holding area for later merging.
+      if(!accounts[n]){
+        if(!window._cloudAcctCache)window._cloudAcctCache={};
+        window._cloudAcctCache[n]=merged;
+      }
     }
   }
-  var parts = [];
-  for (var i = 0; i < total; i++) {
-    if (rowMap[i] === undefined) return null;
-    parts.push(sheet.getRange(rowMap[i], 2).getValue());
-  }
-  // Delete chunk rows in reverse order to preserve row numbers
-  var rows = Object.values(rowMap).sort(function(a,b){return b-a;});
-  for (var j = 0; j < rows.length; j++) {
-    sheet.deleteRow(rows[j]);
-  }
-  return parts.join('');
+  if(rec.newBiz){try{newBiz=typeof rec.newBiz==='string'?JSON.parse(rec.newBiz):rec.newBiz;}catch(e){}}
+  if(rec.rules){try{rules=typeof rec.rules==='string'?JSON.parse(rec.rules):rec.rules;}catch(e){}}
 }
 
-// Delete all leftover __chunk__ rows
-function deleteAllChunkRows() {
-  var sheet   = getSheet();
-  var lastRow = sheet.getLastRow();
-  var toDelete = [];
-  for (var r = 1; r <= lastRow; r++) {
-    if (String(sheet.getRange(r, 1).getValue()).indexOf('__chunk__') === 0) {
-      toDelete.push(r);
+function syncPull(){
+  var url=getSyncUrl();
+  setSyncBtnState(true);
+  showSyncTag('Pulling…','#1a6fa8');
+  gasGet(url,{action:'load'},function(d){
+    setSyncBtnState(false);
+    if(!d.ok){showSyncTag('Pull error: '+(d.error||'failed'),'var(--red)');return;}
+    var rec=d.data;
+    if(!rec||!rec.policies){showSyncTag('Nothing in cloud yet','var(--muted)');return;}
+    try{
+      applyCloudData(rec);
+      repairAccountStatuses();saveAll();populateFilters();updateStats();renderRenewals();renderActions();renderCompleted();renderCancelled();
+      showSyncTag('☁️ Pulled! '+new Date().toLocaleTimeString(),'#1a6fa8');
+    }catch(e){showSyncTag('Pull parse error: '+e.message,'var(--red)');}
+  });
+}
+// ────────────────────────────────────────────────────────────────────────────
+
+function exportCSV() {
+  var rows='Account,Advisor,Status,Exp Date,Policies\n';
+  var ns=Object.keys(accounts);
+  for(var i=0;i<ns.length;i++){
+    var a=accounts[ns[i]];
+    var d=a.policies.length?a.policies[0].expDate:'';
+    var ds=d&&!isNaN(d)?d.toLocaleDateString():'';
+    rows+='"'+a.name.replace(/"/g,'""')+'","'+a.advisor+'","'+a.status+'","'+ds+'",'+a.policies.length+'\n';
+  }
+  var el=document.createElement('a');el.href='data:text/csv;charset=utf-8,'+encodeURIComponent(rows);el.download='KCM_'+new Date().toISOString().slice(0,10)+'.csv';el.click();
+}
+
+function updateStats() {
+  var al=Object.values(accounts);
+  var active=[],comp=[],canc=[];
+  for(var i=0;i<al.length;i++){
+    if(isCancelled(al[i])){canc.push(al[i]);continue;}
+    // count completed and cancelled cards per account
+    var byDate={};for(var j=0;j<al[i].policies.length;j++){var pd=al[i].policies[j].expDate&&!isNaN(al[i].policies[j].expDate)?al[i].policies[j].expDate.toDateString():'';if(!byDate[pd])byDate[pd]=[];byDate[pd].push(al[i].policies[j]);}
+    var dks=Object.keys(byDate);var hasActive=false;
+    for(var j=0;j<dks.length;j++){
+      var cst=(getCardStatus(al[i],dks[j])||'').toLowerCase();
+      if(cst==='cancelled'){canc.push(al[i]);}
+      else if(isCardComplete(al[i],dks[j])){comp.push(al[i]);}
+      else{hasActive=true;}
+    }
+    if(hasActive)active.push(al[i]);
+  }
+  var alerts=0;for(var i=0;i<al.length;i++)alerts+=fireRulesOnAccount(al[i]).length;
+  var s30=0,s60=0,s60p=0,sOvr=0;
+  for(var i=0;i<active.length;i++){var n=acctMinDays(active[i]);if(n===null)continue;if(n<0)sOvr++;else if(n<=30)s30++;else if(n<=60)s60++;else s60p++;}
+  var tm=new Date();
+  var cm=0;for(var i=0;i<comp.length;i++){for(var j=0;j<comp[i].policies.length;j++){var d=comp[i].policies[j].expDate;if(d&&!isNaN(d)&&d.getMonth()===tm.getMonth()&&d.getFullYear()===tm.getFullYear()){cm++;break;}}}
+  var ca=0;for(var i=0;i<canc.length;i++){for(var j=0;j<canc[i].policies.length;j++){var d=canc[i].policies[j].expDate;if(d&&!isNaN(d)&&d.getMonth()===tm.getMonth()&&d.getFullYear()===tm.getFullYear()){ca++;break;}}}
+  var nbP=0,nbB=0,nbPend=0;for(var i=0;i<newBiz.length;i++){if(newBiz[i].status==='In Progress')nbP++;else if(newBiz[i].status==='Bound')nbB++;else nbPend++;}
+  var ron=0;for(var i=0;i<rules.length;i++){if(rules[i].on)ron++;}
+  document.getElementById('sTotal').textContent=active.length;
+  document.getElementById('s30').textContent=s30;
+  document.getElementById('s60').textContent=s60;
+  document.getElementById('s60p').textContent=s60p;
+  document.getElementById('sOvr').textContent=sOvr;
+  document.getElementById('tb-actions').textContent=alerts;
+  document.getElementById('tb-completed').textContent=comp.length;
+  document.getElementById('tb-cancelled').textContent=canc.length;
+  document.getElementById('tb-newbiz').textContent=newBiz.length;
+  document.getElementById('tb-rules').textContent=ron;
+  document.getElementById('compTotal').textContent=comp.length;
+  document.getElementById('cancTotal').textContent=canc.length;
+  document.getElementById('compMonth').textContent=cm;
+  document.getElementById('cancMonth').textContent=ca;
+  document.getElementById('nbTotal').textContent=newBiz.length;
+  document.getElementById('nbProg').textContent=nbP;
+  document.getElementById('nbBound').textContent=nbB;
+  document.getElementById('nbPend').textContent=nbPend;
+}
+
+function switchTab(t) {
+  var tabs=['renewals','actions','newbiz','completed','cancelled','rules'];
+  for(var i=0;i<tabs.length;i++){document.getElementById('section-'+tabs[i]).classList.toggle('hidden',tabs[i]!==t);document.getElementById('tab-'+tabs[i]).classList.toggle('active',tabs[i]===t);}
+  if(t==='actions')renderActions();
+  if(t==='completed')renderCompleted();
+  if(t==='cancelled')renderCancelled();
+}
+
+function setGroup(g) {
+  groupBy=g;
+  var gs=['weekly','biweekly','day'];
+  for(var i=0;i<gs.length;i++)document.getElementById('grp-'+gs[i]).classList.toggle('active',gs[i]===g);
+  renderRenewals();
+}
+
+function populateFilters() {
+  var seen={},advs=[];
+  for(var i=0;i<policies.length;i++){var adv=policies[i].advisor;if(!seen[adv]){seen[adv]=true;advs.push(adv);}}
+  advs.sort();
+  var h='<option value="">All Advisors</option>';for(var i=0;i<advs.length;i++)h+='<option>'+advs[i]+'</option>';
+  document.getElementById('rAdvisor').innerHTML=h;
+  var mset={},mkeys=[];
+  for(var i=0;i<policies.length;i++){var p=policies[i];var d=p.expDate;if(d&&!isNaN(d)){var acct=accounts[p.accountName];if(!acct||!isActive(acct))continue;var k=d.getFullYear()+'-'+pad(d.getMonth()+1);if(!mset[k]){mset[k]=d.toLocaleDateString('en-US',{month:'long',year:'numeric'});mkeys.push(k);}}}
+  mkeys.sort();
+  var mh='<option value="">All Months</option>';for(var i=0;i<mkeys.length;i++)mh+='<option value="'+mkeys[i]+'">'+mset[mkeys[i]]+'</option>';
+  document.getElementById('rMonth').innerHTML=mh;
+  var ck=today.getFullYear()+'-'+pad(today.getMonth()+1);
+  document.getElementById('rMonth').value=mset[ck]?ck:(mkeys.length?mkeys[0]:'');
+  var nh='<option value="">All Advisors</option>';for(var i=0;i<ADVISORS.length;i++)nh+='<option>'+ADVISORS[i]+'</option>';
+  document.getElementById('nbAdvisor').innerHTML=nh;
+}
+
+function pad(n){return n<10?'0'+n:String(n);}
+
+function setCurrentMonth() {
+  var ck=today.getFullYear()+'-'+pad(today.getMonth()+1);
+  document.getElementById('rMonth').value=ck;
+  renderRenewals();
+}
+
+function clearRFilters() {
+  document.getElementById('rSearch').value='';
+  document.getElementById('rAdvisor').value='';
+  document.getElementById('rMonth').value='';
+  document.getElementById('rUrgency').value='';
+  document.getElementById('rAlerts').value='';
+  renderRenewals();
+}
+
+function getGroupKey(expDate) {
+  if(!expDate||isNaN(expDate))return'No Date';
+  if(groupBy==='date')return expDate.toLocaleDateString('en-US',{month:'long',year:'numeric'});
+  if(groupBy==='biweekly'){var day=expDate.getDate();var m=expDate.toLocaleDateString('en-US',{month:'short',year:'numeric'});var s=day<=15?1:16;var e=day<=15?15:new Date(expDate.getFullYear(),expDate.getMonth()+1,0).getDate();return m+' · '+s+'–'+e;}
+  if(groupBy==='weekly'){var d=new Date(expDate);var dow=d.getDay();var mon=new Date(d);mon.setDate(d.getDate()-((dow+6)%7));var sun=new Date(mon);sun.setDate(mon.getDate()+6);return'Week of '+mon.toLocaleDateString('en-US',{month:'short',day:'numeric'})+' – '+sun.toLocaleDateString('en-US',{month:'short',day:'numeric'});}
+  if(groupBy==='day')return expDate.toLocaleDateString('en-US',{weekday:'long',month:'short',day:'numeric',year:'numeric'});
+  return expDate.toLocaleDateString('en-US',{month:'long',year:'numeric'});
+}
+
+function renderRenewals() {
+  var search=document.getElementById('rSearch').value.toLowerCase();
+  var adv=document.getElementById('rAdvisor').value;
+  var mf=document.getElementById('rMonth').value;
+  var urg=document.getElementById('rUrgency').value;
+  var onlyA=document.getElementById('rAlerts').value==='alerts';
+  var al=Object.values(accounts);
+  var groups={};
+  for(var i=0;i<al.length;i++){
+    var a=al[i];
+    if(isCancelled(a))continue;
+    if(search&&a.name.toLowerCase().indexOf(search)<0)continue;
+    if(adv&&a.advisor!==adv)continue;
+    if(urg&&acctUrgClass(a)!==urg)continue;
+    if(onlyA&&fireRulesOnAccount(a).length===0)continue;
+    for(var j=0;j<a.policies.length;j++){
+      var p=a.policies[j];
+      var pdate=p.expDate&&!isNaN(p.expDate)?p.expDate.toDateString():'';
+      if(isCardComplete(a,pdate))continue;
+      if((getCardStatus(a,pdate)||'').toLowerCase()==='cancelled')continue;
+      if(mf){
+        if(!p.expDate||isNaN(p.expDate))continue;
+        var pk=p.expDate.getFullYear()+'-'+pad(p.expDate.getMonth()+1);
+        if(pk!==mf)continue;
+      }
+      var gk=getGroupKey(p.expDate);
+      if(!groups[gk])groups[gk]=[];
+      var found=false;
+      for(var k=0;k<groups[gk].length;k++){if(groups[gk][k].acct===a&&groups[gk][k].dateKey===pdate){groups[gk][k].pols.push(p);found=true;break;}}
+      if(!found)groups[gk].push({acct:a,pols:[p],dateKey:pdate});
     }
   }
-  // Delete in reverse so row numbers stay valid
-  for (var j = toDelete.length - 1; j >= 0; j--) {
-    sheet.deleteRow(toDelete[j]);
+  var keys=Object.keys(groups);
+  keys.sort(function(a,b){
+    var da=groups[a][0].pols[0].expDate; var db=groups[b][0].pols[0].expDate;
+    return(da&&!isNaN(da)?da:new Date(9999,0))-(db&&!isNaN(db)?db:new Date(9999,0));
+  });
+  var kb=document.getElementById('kanban-renewals');
+  if(!keys.length){kb.innerHTML='<div class="empty-state"><div class="icon">🔍</div><h3>No accounts found</h3><p>Try a different month or clear filters</p></div>';return;}
+  var html='';
+  for(var i=0;i<keys.length;i++){
+    var k=keys[i];var entries=groups[k];
+    entries.sort(function(a,b){var da=a.pols[0].expDate;var db=b.pols[0].expDate;return(da&&!isNaN(da)?da:new Date(9999,0))-(db&&!isNaN(db)?db:new Date(9999,0));});
+    var cards='';
+    for(var j=0;j<entries.length;j++)cards+=makeCard(entries[j].acct,entries[j].pols);
+    html+='<div class="col"><div class="col-header"><h3>'+k+'</h3><span class="col-count">'+entries.length+'</span></div><div class="col-body">'+cards+'</div></div>';
   }
-  return toDelete.length;
+  kb.innerHTML=html;
 }
 
-function loadData() {
-  var sheet   = getSheet();
-  var lastRow = sheet.getLastRow();
-  var result  = { ok: true, data: {} };
-  for (var r = 1; r <= lastRow; r++) {
-    var key = String(sheet.getRange(r, 1).getValue());
-    var val = sheet.getRange(r, 2).getValue();
-    // Skip chunk rows
-    if (key.indexOf('__chunk__') === 0) continue;
-    if (key && val) result.data[key] = val;
+function makeCard(a,visiblePols) {
+  var pols=visiblePols||a.policies;
+  var alerts=fireRulesOnAccount(a);
+  var ns=[];for(var i=0;i<pols.length;i++){var n=pols[i].daysUntil;if(n!==null)ns.push(n);}
+  var minD=ns.length?Math.min.apply(null,ns):null;
+  var urgC='',dbC='db-na',dbT='N/A';
+  if(minD!==null){if(minD<0){urgC='urg-past';dbC='db-past';dbT=Math.abs(minD)+'d overdue';}else if(minD<=30){urgC='urg-red';dbC='db-red';dbT=minD+'d';}else if(minD<=60){urgC='urg-yellow';dbC='db-yellow';dbT=minD+'d';}else{urgC='urg-green';dbC='db-green';dbT=minD+'d';}}
+  var fmtD=function(d){return d.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});};
+  var dates=[];for(var i=0;i<pols.length;i++){if(pols[i].expDate&&!isNaN(pols[i].expDate))dates.push(pols[i].expDate);}
+  dates.sort(function(x,y){return x-y;});
+  var dateStr=dates.length?fmtD(dates[0]):'—';
+  var vc=pols.length,tc=a.policies.length;
+  var cntLabel=vc<tc?'📋 '+vc+' of '+tc+' policies':'📋 '+vc+' polic'+(vc===1?'y':'ies');
+  var cardDateKey=pols[0]&&pols[0].expDate&&!isNaN(pols[0].expDate)?pols[0].expDate.toDateString():'';
+  var sk=(a.name+'_'+cardDateKey).replace(/\W/g,'_');
+  var sn=a.name.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+  var st=(a.dateStatuses&&cardDateKey&&a.dateStatuses[cardDateKey])||(!cardDateKey?a.status:'')||'';
+  var sopts=['','Active','In Progress','Pending','Proposed','Quoted','Bound','Cancelled','Non-Renewal','Rewrite'];
+  var shtml='';for(var i=0;i<sopts.length;i++)shtml+='<option'+(st===sopts[i]?' selected':'')+'>'+(sopts[i]||'— Status —')+'</option>';
+  var alertBanner='';
+  if(alerts.length){
+    var msgs={};for(var i=0;i<alerts.length;i++)msgs[alerts[i].msg]=1;
+    var uk=Object.keys(msgs);
+    alertBanner='<div class="acard-alerts">';for(var i=0;i<uk.length;i++)alertBanner+='<div class="alert-item">⚠️ '+uk[i]+'</div>';alertBanner+='</div>';
   }
-  return result;
+  var alertPill=alerts.length?'<span class="alert-pill">⚠️ '+alerts.length+'</span>':'';
+  var polLines='';
+  var totalPrem=0;
+  for(var i=0;i<pols.length;i++){
+    var p=pols[i];
+    var isCancA=isCancelled(a);
+    var chk='';
+    if(!isCancA){for(var j=0;j<CHK.length;j++){var f=CHK[j];chk+='<span class="chk '+(isTruthy(p[f.k])?'done':'undone')+'" onclick="togglePol('+p.id+',\''+f.k+'\',this,event)">'+(isTruthy(p[f.k])?'✔ ':'')+f.l+'</span>';}}
+    var qchk='';
+    if(!isCancA){for(var j=0;j<QUOTES.length;j++){var q=QUOTES[j];if(isRelevantQuote(p.description,q.k))qchk+='<span class="qchk '+(isTruthy(p[q.k])?'done':'undone')+'" onclick="togglePol('+p.id+',\''+q.k+'\',this,event)">'+(isTruthy(p[q.k])?'✔ ':'')+q.l+'</span>';}}
+    var pd=p.expDate&&!isNaN(p.expDate)?fmtD(p.expDate):'';
+    var premVal=p.premium||'';
+    var premNum=parseFloat(premVal.toString().replace(/[$,]/g,''));
+    if(!isNaN(premNum)&&premNum>0)totalPrem+=premNum;
+    var premInp='<div class="pl-premium"><label>💲 Premium</label><input type="text" placeholder="Enter amount" value="'+premVal.replace(/"/g,'&quot;')+'" onchange="setPremium('+p.id+',this.value)" onclick="event.stopPropagation()" onkeydown="event.stopPropagation()"></div>';
+    polLines+='<div class="policy-line"><div class="pl-top"><span class="pl-desc">'+p.description+'</span><div class="pl-meta"><span class="pl-carrier">'+p.issuingCompany+'</span><span class="pl-date">📅 '+pd+'</span></div></div>'+premInp+(chk?'<div class="pl-checks">'+chk+'</div>':'')+(qchk?'<div class="pl-quotes">'+qchk+'</div>':'')+'</div>';
+  }
+  var premTotalBadge=totalPrem>0?'<span class="pl-prem-total">💲'+totalPrem.toLocaleString('en-US',{minimumFractionDigits:0,maximumFractionDigits:0})+'</span>':'';
+  if(!a.followupLog)a.followupLog=[];
+  if(!a.dateNotes)a.dateNotes={};
+  var fl=a.followupLog;
+  // Notes are per date-card only — use dateNotes[cardDateKey], not the old account-level notesLog
+  var nl=a.dateNotes[cardDateKey]||[];
+  var dkEsc=cardDateKey.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+  var flItems='';
+  for(var i=0;i<fl.length;i++)flItems+='<div class="fl-item"><span class="fl-date">'+fl[i].date+'</span><span>'+fl[i].note+'</span><button class="fl-del" onclick="delFL(\''+sn+'\','+i+',event)">✕</button></div>';
+  var flPanel='<div class="acard-followup-panel" id="fl-'+sk+'">'+flItems+'<div class="add-fl-row"><input id="fl-inp-'+sk+'" placeholder="Log follow-up..." onclick="event.stopPropagation()"><button class="add-fl-btn" onclick="addFL(\''+sn+'\',event)">Log</button></div></div>';
+  var nlItems='';
+  for(var i=0;i<nl.length;i++)nlItems+='<div class="fl-item"><span class="fl-date">'+nl[i].date+'</span><span>'+nl[i].text+'</span><button class="fl-del" onclick="delNote(\''+sn+'\',\''+dkEsc+'\','+i+',event)">✕</button></div>';
+  var nlPanel='<div class="acard-followup-panel" id="nl-'+sk+'">'+nlItems+'<div class="add-fl-row"><input id="nl-inp-'+sk+'" placeholder="Add a note..." onclick="event.stopPropagation()"><button class="add-fl-btn" style="background:var(--sky)" onclick="addNote(\''+sn+'\',\''+dkEsc+'\',event)">Add</button></div></div>';
+  return '<div class="acard '+urgC+(alerts.length?' has-alerts':'')+'" id="acard-'+sk+'">'
+    +'<div class="acard-header">'
+      +'<div class="acard-name">'+a.name+'</div>'
+      +'<div class="acard-meta"><span class="days-badge '+dbC+'">📅 '+dbT+'</span><span class="policy-count" onclick="togglePolicies(\''+sk+'\',this,event)">'+cntLabel+'</span>'+premTotalBadge+alertPill+'</div>'
+      +'<div style="font-size:11px;color:var(--muted);">📆 '+dateStr+'</div>'
+    +'</div>'
+    +alertBanner
+    +'<div class="acard-advisor">'
+      +'<div class="advisor-tag" style="padding:0 18px 12px">👤 <span>'+a.advisor+'</span></div>'
+      +'<div style="padding:0 18px 12px"><select class="status-select" onchange="setAcctStatus(\''+sn+'\',this,event,\''+(pols[0].expDate&&!isNaN(pols[0].expDate)?pols[0].expDate.toDateString():'')+'\')">'+shtml+'</select></div>'
+    +'</div>'
+    +'<div class="policy-lines" id="pl-'+sk+'">'+polLines+'</div>'
+    +'<div class="acard-footer">'
+      +'<button class="expand-policies-btn" onclick="togglePolicies(\''+sk+'\',this,event)">📋 View Policies</button>'
+      +'<button class="followup-btn" onclick="togglePanel(\'fl-'+sk+'\',event)">📞 Follow-up'+(fl.length?' ('+fl.length+')':'')+'</button>'
+      +'<button class="followup-btn" style="background:var(--sky-light);color:var(--sky-dark)" onclick="togglePanel(\'nl-'+sk+'\',event)">📝 Notes'+(nl.length?' ('+nl.length+')':'')+'</button>'
+    +'</div>'
+    +flPanel
+    +nlPanel
+    +'</div>';
 }
 
-// doPost kept for any future use
-function doPost(e) {
-  function respond(obj) {
-    return ContentService.createTextOutput(JSON.stringify(obj))
-      .setMimeType(ContentService.MimeType.JSON);
-  }
-  return respond({ ok: false, error: 'POST not used by this version' });
+function togglePolicies(key,btn,e) {
+  if(e)e.stopPropagation();
+  var el=document.getElementById('pl-'+key);if(!el)return;
+  el.classList.toggle('open');
+  var open=el.classList.contains('open');
+  var card=el.closest('.acard');
+  if(card){var fb=card.querySelector('.expand-policies-btn');if(fb)fb.textContent=open?'📋 Hide Policies':'📋 View Policies';}
 }
+
+function togglePanel(id,e) {
+  if(e)e.stopPropagation();
+  var el=document.getElementById(id);if(el)el.classList.toggle('open');
+}
+
+function togglePol(id,field,el,e) {
+  if(e)e.stopPropagation();
+  var p=null;for(var i=0;i<policies.length;i++){if(policies[i].id===id){p=policies[i];break;}}
+  if(!p)return;
+  p[field]=isTruthy(p[field])?'':'Yes';
+  var lbl='';
+  for(var i=0;i<CHK.length;i++){if(CHK[i].k===field){lbl=CHK[i].l;break;}}
+  if(!lbl)for(var i=0;i<QUOTES.length;i++){if(QUOTES[i].k===field){lbl=QUOTES[i].l;break;}}
+  var done=isTruthy(p[field]);
+  el.className=(el.className.indexOf('qchk')>=0?'qchk ':'chk ')+(done?'done':'undone');
+  el.innerHTML=(done?'✔ ':'')+lbl;
+  var acct=accounts[p.accountName];if(!acct)return;
+  var na=fireRulesOnAccount(acct);
+  var card=document.getElementById('acard-'+p.accountName.replace(/\W/g,'_'));
+  if(card){
+    var ex=card.querySelector('.acard-alerts');if(ex)ex.remove();
+    if(na.length){var msgs={};for(var i=0;i<na.length;i++)msgs[na[i].msg]=1;var uk=Object.keys(msgs);var div=document.createElement('div');div.className='acard-alerts';for(var i=0;i<uk.length;i++){var d=document.createElement('div');d.className='alert-item';d.textContent='⚠️ '+uk[i];div.appendChild(d);}var hdr=card.querySelector('.acard-header');if(hdr&&hdr.nextSibling){card.insertBefore(div,hdr.nextSibling);}else{card.insertBefore(div,card.firstChild);}}
+    var pill=card.querySelector('.alert-pill');
+    if(pill){if(na.length)pill.textContent='⚠️ '+na.length;else pill.remove();}
+    card.classList.toggle('has-alerts',na.length>0);
+  }
+  // Check if this policy's card is now fully complete → re-render
+  var pdate=p.expDate&&!isNaN(p.expDate)?p.expDate.toDateString():'';
+  if(acct&&isCardComplete(acct,pdate)){
+    updateStats();renderActions();renderRenewals();renderCompleted();saveAll();return;
+  }
+  updateStats();renderActions();saveAll();
+}
+
+function setPremium(id,val) {
+  var p=null;for(var i=0;i<policies.length;i++){if(policies[i].id===id){p=policies[i];break;}}
+  if(!p)return;
+  p.premium=val.trim();
+  // update total badge on card without full re-render
+  var acct=accounts[p.accountName];if(!acct)return;
+  var sk=p.accountName.replace(/\W/g,'_');
+  var card=document.getElementById('acard-'+sk);
+  if(card){
+    var total=0;
+    for(var i=0;i<acct.policies.length;i++){var v=parseFloat((acct.policies[i].premium||'').toString().replace(/[$,]/g,''));if(!isNaN(v)&&v>0)total+=v;}
+    var badge=card.querySelector('.pl-prem-total');
+    if(total>0){
+      var fmt='💲'+total.toLocaleString('en-US',{minimumFractionDigits:0,maximumFractionDigits:0});
+      if(badge){badge.textContent=fmt;}
+      else{var meta=card.querySelector('.acard-meta');if(meta){var sp=document.createElement('span');sp.className='pl-prem-total';sp.textContent=fmt;var pill=meta.querySelector('.alert-pill');if(pill)meta.insertBefore(sp,pill);else meta.appendChild(sp);}}
+    } else {if(badge)badge.remove();}
+  }
+  updateStats();
+}
+
+var _boundPending={name:null,sel:null,prev:null,dateKey:null};
+function getCardStatus(a,dateKey){
+  // Per-card status takes priority
+  if(a.dateStatuses&&dateKey&&a.dateStatuses[dateKey]!==undefined)return a.dateStatuses[dateKey];
+  // Only fall back to account-level status if there are NO per-card statuses at all
+  // (i.e. this is an old account that predates per-card tracking)
+  // If per-card statuses exist, a missing dateKey just means "not yet set" = ''
+  if(a.dateStatuses&&Object.keys(a.dateStatuses).length>0)return '';
+  return a.status||'';
+}
+function setCardStatus(a,dateKey,val){
+  if(dateKey){if(!a.dateStatuses)a.dateStatuses={};a.dateStatuses[dateKey]=val;}
+  else a.status=val;
+}
+function setAcctStatus(name,sel,e,dateKey) {
+  if(e)e.stopPropagation();
+  var a=accounts[name];if(!a)return;
+  if(sel.value==='Rewrite'){openRewrite(name,sel);return;}
+  var prev=getCardStatus(a,dateKey);
+  if(sel.value==='Bound'){
+    _boundPending={name:name,sel:sel,prev:prev,dateKey:dateKey||null};
+    document.getElementById('boundAcctName').textContent=name+(dateKey?' — '+dateKey:'');
+    // Build per-policy input rows for this card's dateKey
+    var cardPols=[];
+    for(var ci=0;ci<a.policies.length;ci++){
+      var cp=a.policies[ci];
+      var cpdk=cp.expDate&&!isNaN(cp.expDate)?cp.expDate.toDateString():'';
+      if(!dateKey||cpdk===dateKey)cardPols.push(cp);
+    }
+    var linesHtml='';
+    for(var ci=0;ci<cardPols.length;ci++){
+      var cp=cardPols[ci];
+      var savedCarrier=(cp.boundCarrier)||'';
+      var savedPremium=(cp.boundPremium)||a.boundPremium||'';
+      linesHtml+='<div style="background:#f7fafd;border:1.5px solid var(--border);border-radius:10px;padding:12px 14px;">'
+        +'<div style="font-size:12px;font-weight:700;color:var(--text);margin-bottom:10px;">📋 '+cp.description+'</div>'
+        +'<div style="display:flex;gap:10px;flex-wrap:wrap;">'
+        +'<div class="field-group" style="flex:1;min-width:140px;margin:0"><label>Carrier</label><input data-polid="'+cp.id+'" data-field="carrier" placeholder="e.g. Travelers…" value="'+savedCarrier.replace(/"/g,'&quot;')+'"></div>'
+        +'<div class="field-group" style="flex:1;min-width:120px;margin:0"><label>Premium</label><input data-polid="'+cp.id+'" data-field="premium" placeholder="e.g. $12,500" value="'+savedPremium.replace(/"/g,'&quot;')+'"></div>'
+        +'</div>'
+        +'</div>';
+    }
+    document.getElementById('boundPolLines').innerHTML=linesHtml;
+    document.getElementById('boundOverlay').classList.remove('hidden');
+    setTimeout(function(){var f=document.querySelector('#boundPolLines input');if(f)f.focus();},100);
+    return;
+  }
+  if(sel.value==='Cancelled'){
+    if(!confirm('Mark "'+name+'" as CANCELLED?\nThis will remove it from the Renewals board.')){sel.value=prev;return;}
+    // Set per-card only — never account-level, so other date cards aren't affected
+    setCardStatus(a,dateKey,'Cancelled');
+    updateStats();renderActions();renderRenewals();renderCancelled();saveAll();return;
+  }
+  setCardStatus(a,dateKey,sel.value);
+  updateStats();renderActions();renderRenewals();saveAll();
+}
+function closeBoundModal(){
+  document.getElementById('boundOverlay').classList.add('hidden');
+  if(_boundPending.sel)_boundPending.sel.value=_boundPending.prev||'';
+  _boundPending={name:null,sel:null,prev:null,dateKey:null};
+}
+function confirmBound(){
+  var name=_boundPending.name;if(!name)return;
+  var a=accounts[name];if(!a)return;
+  // Save per-policy carrier and premium from modal inputs
+  var inputs=document.querySelectorAll('#boundPolLines input');
+  for(var ci=0;ci<inputs.length;ci++){
+    var inp=inputs[ci];
+    var pid=parseInt(inp.getAttribute('data-polid'));
+    var field=inp.getAttribute('data-field');
+    for(var pi=0;pi<policies.length;pi++){
+      if(policies[pi].id===pid){
+        if(field==='carrier')policies[pi].boundCarrier=inp.value.trim();
+        if(field==='premium'){policies[pi].boundPremium=inp.value.trim();policies[pi].premium=inp.value.trim();}
+        break;
+      }
+    }
+  }
+  // Also store first carrier/premium on account level for display in completed tab
+  var firstCarrier='',firstPremium='';
+  for(var ci=0;ci<inputs.length;ci++){var inp=inputs[ci];if(inp.getAttribute('data-field')==='carrier'&&!firstCarrier)firstCarrier=inp.value.trim();if(inp.getAttribute('data-field')==='premium'&&!firstPremium)firstPremium=inp.value.trim();}
+  a.boundCarrier=firstCarrier;a.boundPremium=firstPremium;
+  // Track which date group was bound (always per-card, never account-level)
+  var dk=_boundPending.dateKey;
+  if(!a.boundDates)a.boundDates=[];
+  if(dk){
+    if(a.boundDates.indexOf(dk)<0)a.boundDates.push(dk);
+    setCardStatus(a,dk,'Bound');
+  } else {
+    // No dateKey — find the first unbounded card and bind it
+    var byDate={};
+    for(var pi=0;pi<a.policies.length;pi++){var p2=a.policies[pi];var dk2=p2.expDate&&!isNaN(p2.expDate)?p2.expDate.toDateString():'';if(!byDate[dk2])byDate[dk2]=[];byDate[dk2].push(p2);}
+    var dks2=Object.keys(byDate);
+    if(dks2.length>0){dk=dks2[0];if(a.boundDates.indexOf(dk)<0)a.boundDates.push(dk);setCardStatus(a,dk,'Bound');}
+  }
+  document.getElementById('boundOverlay').classList.add('hidden');
+  _boundPending={name:null,sel:null,prev:null,dateKey:null};
+  updateStats();renderActions();renderRenewals();renderCompleted();
+  saveAll();
+}
+
+function addFL(name,e) {
+  e.stopPropagation();
+  var a=accounts[name];if(!a)return;
+  var sk=name.replace(/\W/g,'_');
+  var inp=document.getElementById('fl-inp-'+sk);
+  var note=inp?inp.value.trim():'';if(!note)return;
+  if(!a.followupLog)a.followupLog=[];
+  a.followupLog.unshift({date:new Date().toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}),note:note});
+  renderRenewals();
+}
+
+function delFL(name,idx,e) {
+  e.stopPropagation();
+  var a=accounts[name];if(!a||!a.followupLog)return;
+  a.followupLog.splice(idx,1);renderRenewals();
+}
+
+function addNote(name,dateKey,e) {
+  e.stopPropagation();
+  var a=accounts[name];if(!a)return;
+  var sk=(name+'_'+dateKey).replace(/\W/g,'_');
+  var inp=document.getElementById('nl-inp-'+sk);
+  var text=inp?inp.value.trim():'';if(!text)return;
+  if(!a.dateNotes)a.dateNotes={};
+  if(!a.dateNotes[dateKey])a.dateNotes[dateKey]=[];
+  a.dateNotes[dateKey].unshift({date:new Date().toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}),text:text});
+  saveAll();renderRenewals();
+}
+
+function delNote(name,dateKey,idx,e) {
+  e.stopPropagation();
+  var a=accounts[name];if(!a||!a.dateNotes||!a.dateNotes[dateKey])return;
+  a.dateNotes[dateKey].splice(idx,1);
+  saveAll();renderRenewals();
+}
+
+function renderActions() {
+  var search=(document.getElementById('actionSearch')||{value:''}).value.toLowerCase();
+  var sevF=(document.getElementById('actionSeverity')||{value:''}).value;
+  var advF=(document.getElementById('actionAdvisor')||{value:''}).value;
+  var advSel=document.getElementById('actionAdvisor');
+  if(advSel&&advSel.options.length===1){var seen={},advs=[];for(var i=0;i<policies.length;i++){var adv=policies[i].advisor;if(!seen[adv]){seen[adv]=true;advs.push(adv);}}advs.sort();for(var i=0;i<advs.length;i++){var o=document.createElement('option');o.value=advs[i];o.textContent=advs[i];advSel.appendChild(o);}}
+  var crit=[],warn=[],info=[];
+  var al=Object.values(accounts);
+  for(var i=0;i<al.length;i++){
+    var a=al[i];if(advF&&a.advisor!==advF)continue;
+    var als=fireRulesOnAccount(a);
+    for(var j=0;j<als.length;j++){
+      var al2=als[j];if(sevF&&al2.severity!==sevF)continue;
+      if(search&&(a.name+al2.desc+al2.msg).toLowerCase().indexOf(search)<0)continue;
+      var p2=null;for(var k=0;k<policies.length;k++){if(policies[k].id===al2.polId){p2=policies[k];break;}}
+      var n=p2?p2.daysUntil:null;
+      var tag=n!==null&&n<0?'<span class="action-tag red">OVERDUE</span>':n!==null?'<span class="action-tag '+(n<=30?'red':n<=60?'yellow':'green')+'">'+n+'d</span>':'';
+      var sv=al2.severity;
+      var card='<div class="action-card '+(sv==='crit'?'crit':sv==='warn'?'warn':'info')+'"><div style="font-size:20px">'+(sv==='crit'?'🔴':sv==='warn'?'🟡':'🔵')+'</div><div class="action-body"><div class="action-title">'+a.name+'</div><div class="action-sub">'+al2.desc+' · '+a.advisor+'</div><div class="action-meta">'+tag+'<span class="action-tag">'+al2.msg+'</span></div></div></div>';
+      if(sv==='crit')crit.push(card);else if(sv==='warn')warn.push(card);else info.push(card);
+    }
+  }
+  document.getElementById('aCrit').textContent=crit.length;
+  document.getElementById('aWarn').textContent=warn.length;
+  document.getElementById('aInfo').textContent=info.length;
+  var sec=document.getElementById('action-section');
+  if(!crit.length&&!warn.length&&!info.length){sec.innerHTML='<div class="empty-state"><div class="icon">✅</div><h3>No action items!</h3></div>';return;}
+  var html='';
+  if(crit.length)html+='<div class="action-group"><div class="action-group-title">🔴 Critical ('+crit.length+')</div>'+crit.join('')+'</div>';
+  if(warn.length)html+='<div class="action-group"><div class="action-group-title">🟡 Needs Attention ('+warn.length+')</div>'+warn.join('')+'</div>';
+  if(info.length)html+='<div class="action-group"><div class="action-group-title">🔵 Upcoming ('+info.length+')</div>'+info.join('')+'</div>';
+  sec.innerHTML=html;
+}
+
+function renderCompleted() {
+  var search=document.getElementById('compSearch').value.toLowerCase();
+  var adv=document.getElementById('compAdvisor').value;
+  var advSel=document.getElementById('compAdvisor');
+  if(advSel.options.length===1){var seen={},advs=[];for(var i=0;i<policies.length;i++){var a2=policies[i].advisor;if(!seen[a2]){seen[a2]=true;advs.push(a2);}}advs.sort();for(var i=0;i<advs.length;i++){var o=document.createElement('option');o.value=advs[i];o.textContent=advs[i];advSel.appendChild(o);}}
+  // Collect completed cards (account + dateKey pairs)
+  var al=Object.values(accounts);var completedCards=[];
+  for(var i=0;i<al.length;i++){
+    var a=al[i];if(isCancelled(a))continue;
+    if(search&&a.name.toLowerCase().indexOf(search)<0)continue;
+    if(adv&&a.advisor!==adv)continue;
+    // group policies by dateKey
+    var byDate={};
+    for(var j=0;j<a.policies.length;j++){
+      var p=a.policies[j];
+      var dk=p.expDate&&!isNaN(p.expDate)?p.expDate.toDateString():'';
+      if(!byDate[dk])byDate[dk]=[];
+      byDate[dk].push(p);
+    }
+    var dks=Object.keys(byDate);
+    for(var j=0;j<dks.length;j++){
+      var dk=dks[j];
+      if(isCardComplete(a,dk))completedCards.push({acct:a,pols:byDate[dk],dateKey:dk});
+    }
+  }
+  var kb=document.getElementById('kanban-completed');
+  if(!completedCards.length){kb.innerHTML='<div class="empty-state"><div class="icon">✅</div><h3>No completed cards yet</h3><p>Mark as <strong>Bound</strong> and check all boxes to complete a card</p></div>';return;}
+  // group by advisor
+  var groups={};
+  for(var i=0;i<completedCards.length;i++){var k=completedCards[i].acct.advisor||'Unassigned';if(!groups[k])groups[k]=[];groups[k].push(completedCards[i]);}
+  var gk=Object.keys(groups).sort();var html='';
+  for(var i=0;i<gk.length;i++){
+    var k=gk[i];var items=groups[k];var cards='';
+    for(var j=0;j<items.length;j++){
+      var entry=items[j];var a=entry.acct;var pols=entry.pols;var dk=entry.dateKey;
+      var dates=[];for(var m=0;m<pols.length;m++){if(pols[m].expDate&&!isNaN(pols[m].expDate))dates.push(pols[m].expDate);}
+      dates.sort(function(x,y){return x-y;});
+      var ds=dates.length?dates[0].toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}):'—';
+      var sn=a.name.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+      var dkEsc=dk.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+      var boundLines='';
+      for(var m=0;m<pols.length;m++){
+        var bp=pols[m];
+        var bline='<div style="font-size:11px;color:var(--text);padding:1px 0;"><span style="font-weight:700;">'+bp.description+'</span>';
+        if(bp.boundCarrier)bline+=' · 🏢 '+bp.boundCarrier;
+        if(bp.boundPremium)bline+=' · 💲 '+bp.boundPremium;
+        bline+='</div>';
+        boundLines+=bline;
+      }
+      var boundInfo=boundLines?'<div style="padding:2px 18px 10px;">'+boundLines+'</div>':'';
+      var bpremTotal=0;for(var m=0;m<pols.length;m++){var bpv=parseFloat((pols[m].boundPremium||pols[m].premium||'').toString().replace(/[$,]/g,''));if(!isNaN(bpv)&&bpv>0)bpremTotal+=bpv;}
+      var bprem=bpremTotal>0?'💲'+bpremTotal.toLocaleString('en-US',{minimumFractionDigits:0,maximumFractionDigits:0}):'';
+      cards+='<div class="acard urg-green" style="border-left-color:var(--green)">'
+        +'<div class="comp-banner"><span style="font-size:12px;font-weight:700;color:var(--green-dark)">✅ Bound & Complete</span></div>'
+        +'<div class="acard-header"><div class="acard-name">'+a.name+'</div><div class="acard-meta"><span class="days-badge db-green">📅 '+ds+'</span><span class="policy-count">📋 '+pols.length+' polic'+(pols.length===1?'y':'ies')+'</span>'+(bprem?'<span class="pl-prem-total">'+bprem+'</span>':'')+'</div></div>'
+        +boundInfo
+        +'<div class="acard-advisor"><div class="advisor-tag" style="padding:0 18px 12px">👤 <span>'+a.advisor+'</span></div><div style="padding:0 18px 12px"><button class="followup-btn" style="background:#fdeaea;color:var(--red)" onclick="undoComplete(\''+sn+'\',\''+dkEsc+'\')">↩ Move Back</button></div></div>'
+        +'</div>';
+    }
+    html+='<div class="col"><div class="col-header"><h3>'+k+'</h3><span class="col-count">'+items.length+'</span></div><div class="col-body">'+cards+'</div></div>';
+  }
+  kb.innerHTML=html;
+}
+
+function undoComplete(name,dateKey){
+  var a=accounts[name];if(!a)return;
+  // Reset the card's status back to empty
+  setCardStatus(a,dateKey,'');
+  // Also clear from boundDates so it shows on renewals again
+  if(dateKey&&a.boundDates){var idx=a.boundDates.indexOf(dateKey);if(idx>=0)a.boundDates.splice(idx,1);}
+  updateStats();renderCompleted();renderRenewals();saveAll();
+}
+
+function renderCancelled() {
+  var search=document.getElementById('cancSearch').value.toLowerCase();
+  var adv=document.getElementById('cancAdvisor').value;
+  var advSel=document.getElementById('cancAdvisor');
+  if(advSel.options.length===1){var seen={},advs=[];for(var i=0;i<policies.length;i++){var a2=policies[i].advisor;if(!seen[a2]){seen[a2]=true;advs.push(a2);}}advs.sort();for(var i=0;i<advs.length;i++){var o=document.createElement('option');o.value=advs[i];o.textContent=advs[i];advSel.appendChild(o);}}
+  var al=Object.values(accounts);
+  // Collect cancelled entries: either whole-account cancelled, or individual date cards cancelled
+  var entries=[];
+  for(var i=0;i<al.length;i++){
+    var a=al[i];
+    if(search&&a.name.toLowerCase().indexOf(search)<0)continue;
+    if(adv&&a.advisor!==adv)continue;
+    if(isCancelled(a)){
+      // Whole account cancelled (no per-card statuses) — show as before
+      entries.push({acct:a,dateKey:'',wholAcct:true});
+    } else {
+      // Check each date card for per-card Cancelled status
+      var byDate={};for(var j=0;j<a.policies.length;j++){var p=a.policies[j];var dk=p.expDate&&!isNaN(p.expDate)?p.expDate.toDateString():'';if(!byDate[dk])byDate[dk]=[];byDate[dk].push(p);}
+      var dks=Object.keys(byDate);
+      for(var j=0;j<dks.length;j++){
+        if((getCardStatus(a,dks[j])||'').toLowerCase()==='cancelled'){
+          entries.push({acct:a,dateKey:dks[j],pols:byDate[dks[j]],wholAcct:false});
+        }
+      }
+    }
+  }
+  var kb=document.getElementById('kanban-cancelled');
+  if(!entries.length){kb.innerHTML='<div class="empty-state"><div class="icon">🚫</div><h3>No cancelled accounts</h3><p>Set status to <strong>Cancelled</strong></p></div>';return;}
+  var groups={};for(var i=0;i<entries.length;i++){var k=(entries[i].acct.advisor)||'Unassigned';if(!groups[k])groups[k]=[];groups[k].push(entries[i]);}
+  var gk=Object.keys(groups).sort();var html='';
+  for(var i=0;i<gk.length;i++){
+    var k=gk[i];var items=groups[k];var cards='';
+    for(var j=0;j<items.length;j++){
+      var ent=items[j];var a=ent.acct;
+      var sn=a.name.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+      var dkEsc=(ent.dateKey||'').replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+      var ds='—';
+      if(ent.dateKey){
+        var d=new Date(ent.dateKey);if(!isNaN(d))ds=d.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
+      } else {
+        var dates=[];for(var m=0;m<a.policies.length;m++){if(a.policies[m].expDate&&!isNaN(a.policies[m].expDate))dates.push(a.policies[m].expDate);}
+        dates.sort(function(x,y){return x-y;});
+        if(dates.length)ds=dates[0].toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
+      }
+      cards+='<div class="acard" style="border-left-color:#999;opacity:0.9">'
+        +'<div class="canc-banner"><span style="font-size:12px;font-weight:700;color:#666">🚫 Cancelled</span></div>'
+        +'<div class="acard-header"><div class="acard-name">'+a.name+'</div><div class="acard-meta"><span class="days-badge db-na">📅 '+ds+'</span></div></div>'
+        +'<div class="acard-advisor"><div class="advisor-tag" style="padding:0 18px 12px">👤 <span>'+a.advisor+'</span></div><div style="padding:0 18px 12px"><button class="followup-btn" style="background:#fdeaea;color:var(--red)" onclick="undoCancelled(\''+sn+'\',\''+dkEsc+'\')">↩ Move Back</button></div></div>'
+        +'</div>';
+    }
+    html+='<div class="col"><div class="col-header"><h3>'+k+'</h3><span class="col-count">'+items.length+'</span></div><div class="col-body">'+cards+'</div></div>';
+  }
+  kb.innerHTML=html;
+}
+
+function undoCancelled(name,dateKey){
+  var a=accounts[name];if(!a)return;
+  if(dateKey){
+    // Per-card cancel — clear just that card's status
+    setCardStatus(a,dateKey,'');
+  } else {
+    // Whole-account cancel (legacy)
+    a.status='';
+  }
+  updateStats();renderCancelled();renderRenewals();saveAll();
+}
+
+function renderNewBiz() {
+  var search=document.getElementById('nbSearch').value.toLowerCase();
+  var adv=document.getElementById('nbAdvisor').value;
+  var filtered=[];
+  for(var i=0;i<newBiz.length;i++){var d=newBiz[i];if(search&&(d.accountName+(d.description||'')).toLowerCase().indexOf(search)<0)continue;if(adv&&d.advisor!==adv)continue;filtered.push(d);}
+  var kb=document.getElementById('kanban-newbiz');
+  if(!filtered.length){kb.innerHTML='<div class="empty-state"><div class="icon">✨</div><h3>No new business yet</h3><p>Click ＋ Add New Business</p></div>';return;}
+  var groups={};for(var i=0;i<filtered.length;i++){var k=filtered[i].advisor||'Unassigned';if(!groups[k])groups[k]=[];groups[k].push(filtered[i]);}
+  var gk=Object.keys(groups).sort();var html='';
+  for(var i=0;i<gk.length;i++){
+    var k=gk[i];var items=groups[k];var cards='';
+    for(var j=0;j<items.length;j++){
+      var d=items[j];var ds=d.effectiveDate?new Date(d.effectiveDate).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}):'No date';
+      cards+='<div class="acard urg-green" onclick="openModal(\''+d.id+'\')"><div class="acard-header"><div class="acard-name">'+(d.accountName||'Unnamed')+'</div><div class="acard-meta"><span class="days-badge db-green">✨ New Biz</span><span style="background:#E8F3FD;color:var(--sky-dark);border-radius:20px;padding:4px 11px;font-size:11px;font-weight:700">'+(d.status||'Pending')+'</span></div><div style="font-size:11px;color:var(--muted)">📆 Eff. '+ds+' · 🏢 '+(d.carrier||'—')+'</div></div><div class="acard-advisor"><div class="advisor-tag" style="padding:0 18px 12px">👤 <span>'+(d.advisor||'—')+'</span></div></div></div>';
+    }
+    html+='<div class="col"><div class="col-header"><h3>'+k+'</h3><span class="col-count">'+items.length+'</span></div><div class="col-body">'+cards+'</div></div>';
+  }
+  kb.innerHTML=html;
+  updateStats();
+}
+
+function renderRules() {
+  var html='';
+  for(var i=0;i<rules.length;i++){
+    var r=rules[i];var icon=r.severity==='crit'?'🔴':r.severity==='warn'?'🟡':'🔵';
+    html+='<div class="rule-card"><div style="font-size:22px">'+icon+'</div><div class="rule-body"><div class="rule-name">'+r.name+'</div><div class="rule-desc">'+(r.desc||r.msg)+'</div></div><button class="rule-toggle '+(r.on?'on':'')+'" onclick="toggleRule(\''+r.id+'\',this)"></button>'+(!r.builtIn?'<button class="rule-del" onclick="deleteRule(\''+r.id+'\')">Delete</button>':'')+'</div>';
+  }
+  document.getElementById('rules-list').innerHTML=html;
+}
+
+function toggleRule(id,btn){for(var i=0;i<rules.length;i++){if(rules[i].id===id){rules[i].on=!rules[i].on;btn.classList.toggle('on',rules[i].on);break;}}updateStats();renderActions();}
+
+function deleteRule(id){if(!confirm('Delete?'))return;var nr=[];for(var i=0;i<rules.length;i++){if(rules[i].id!==id)nr.push(rules[i]);}rules=nr;renderRules();updateStats();renderActions();}
+
+function toggleAddRule(){document.getElementById('addRuleForm').classList.toggle('open');}
+
+function saveRule(){
+  var name=document.getElementById('rName').value.trim();var msg=document.getElementById('rMsg').value.trim();
+  if(!name||!msg){alert('Name and message required.');return;}
+  rules.push({id:'r_'+Date.now(),name:name,desc:msg,field:document.getElementById('rField').value,op:document.getElementById('rOp').value,val:document.getElementById('rVal').value,daysCond:document.getElementById('rDaysCond').value,daysVal:parseInt(document.getElementById('rDaysVal').value)||0,msg:msg,severity:document.getElementById('rSeverity').value,on:true,builtIn:false});
+  renderRules();updateStats();renderActions();document.getElementById('addRuleForm').classList.remove('open');
+  document.getElementById('rName').value='';document.getElementById('rVal').value='';document.getElementById('rMsg').value='';document.getElementById('rDaysVal').value='';
+}
+
+function openRewrite(name,sel){
+  var a=accounts[name];if(!a)return;
+  rewriteAcct=name;rewriteSel=sel;
+  document.getElementById('rewriteAcctName').textContent=name;
+  var body=document.getElementById('rewriteBody');
+  var html='<p style="font-size:12px;color:var(--muted);margin-bottom:14px">Enter new date per policy. Leave blank to keep current.</p>';
+  for(var i=0;i<a.policies.length;i++){
+    var p=a.policies[i];
+    var cur=p.expDate&&!isNaN(p.expDate)?p.expDate.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}):'';
+    html+='<div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid #EEF5FA"><div style="flex:1"><div style="font-size:12px;font-weight:700">'+p.description+'</div><div style="font-size:10px;color:var(--muted)">🏢 '+p.issuingCompany+(cur?' · '+cur:'')+'</div></div><input type="date" id="rw-'+p.id+'" style="border:1.5px solid var(--border);border-radius:8px;padding:6px 10px;font-size:12px;outline:none;min-width:145px"></div>';
+  }
+  body.innerHTML=html;
+  document.getElementById('rewriteOverlay').classList.remove('hidden');
+}
+
+function closeRewrite(){
+  document.getElementById('rewriteOverlay').classList.add('hidden');
+  if(rewriteSel){var a=accounts[rewriteAcct];if(a)rewriteSel.value=a.status||'';}
+  rewriteAcct=null;rewriteSel=null;
+}
+
+function saveRewrite(){
+  var a=accounts[rewriteAcct];if(!a)return;
+  for(var i=0;i<a.policies.length;i++){
+    var p=a.policies[i];
+    var inp=document.getElementById('rw-'+p.id);
+    if(inp&&inp.value){var nd=new Date(inp.value);nd.setHours(0,0,0,0);if(!isNaN(nd)){p.expDate=nd;p.daysUntil=Math.round((nd-today)/86400000);for(var j=0;j<RAW.length;j++){if(RAW[j][1]===p.accountName&&RAW[j][4]===p.description){RAW[j][0]=nd.toLocaleDateString('en-US');break;}}}}
+  }
+  a.status='Rewrite';
+  document.getElementById('rewriteOverlay').classList.add('hidden');
+  rewriteAcct=null;rewriteSel=null;
+  updateStats();renderActions();renderRenewals();
+}
+
+function openModal(id){
+  editingId=id;var isNew=id===null;
+  var d=isNew?{}:null;
+  for(var i=0;i<newBiz.length;i++){if(newBiz[i].id===id){d=newBiz[i];break;}}
+  if(!d)d={};
+  document.getElementById('modalTitle').textContent=isNew?'Add New Business':'Edit New Business';
+  document.getElementById('modalSub').textContent=isNew?'':(d.accountName||'');
+  document.getElementById('mName').value=d.accountName||'';
+  document.getElementById('mDesc').value=d.description||'';
+  document.getElementById('mDate').value=d.effectiveDate||'';
+  document.getElementById('mAdvisor').value=d.advisor||ADVISORS[0];
+  document.getElementById('mCarrier').value=d.carrier||'';
+  document.getElementById('mStatus').value=d.status||'';
+  document.getElementById('mNotes').value=d.notes||'';
+  document.getElementById('mDelete').classList.toggle('hidden',isNew);
+  document.getElementById('modalOverlay').classList.remove('hidden');
+}
+
+function closeModal(){document.getElementById('modalOverlay').classList.add('hidden');}
+
+function saveModal(){
+  var name=document.getElementById('mName').value.trim();if(!name){alert('Account name required.');return;}
+  var obj={id:editingId||'nb_'+Date.now(),accountName:name,description:document.getElementById('mDesc').value,advisor:document.getElementById('mAdvisor').value,carrier:document.getElementById('mCarrier').value,status:document.getElementById('mStatus').value,notes:document.getElementById('mNotes').value,effectiveDate:document.getElementById('mDate').value};
+  var found=false;for(var i=0;i<newBiz.length;i++){if(newBiz[i].id===editingId){Object.assign(newBiz[i],obj);found=true;break;}}
+  if(!found)newBiz.push(obj);
+  renderNewBiz();updateStats();closeModal();
+}
+
+function deleteEntry(){
+  if(!confirm('Delete?'))return;
+  var nb2=[];for(var i=0;i<newBiz.length;i++){if(newBiz[i].id!==editingId)nb2.push(newBiz[i]);}
+  newBiz=nb2;renderNewBiz();updateStats();closeModal();
+}
+
+function handleFile(e){
+  var file=e.target.files[0];if(!file)return;
+  var isCSV=file.name.toLowerCase().indexOf('.csv')>=0;
+  var reader=new FileReader();
+  reader.onload=function(ev){
+    var raw;
+    if(isCSV){
+      raw=[];var lines=ev.target.result.split('\n');
+      for(var i=0;i<lines.length;i++){var cols=[],cur='',inQ=false;for(var j=0;j<lines[i].length;j++){var ch=lines[i][j];if(ch==='"'){inQ=!inQ;}else if(ch===','&&!inQ){cols.push(cur.trim());cur='';}else cur+=ch;}cols.push(cur.trim());raw.push(cols);}
+    } else {
+      var wb=XLSX.read(ev.target.result,{type:'binary',cellDates:true});
+      var ws=wb.Sheets[wb.SheetNames[0]];
+      raw=XLSX.utils.sheet_to_json(ws,{header:1,defval:''});
+    }
+    if(!raw||!raw.length){alert('File appears empty.');return;}
+    var hr=0;for(var i=0;i<Math.min(6,raw.length);i++){var cnt=0;for(var j=0;j<raw[i].length;j++){if(raw[i][j]!=='')cnt++;}if(cnt>3){hr=i;break;}}
+    var headers=[];for(var i=0;i<raw[hr].length;i++)headers.push(raw[hr][i]?raw[hr][i].toString():'');
+    var hm={accountName:['accountname','account name','account'],expDate:['expirationdate','expiration date','exp date','expiration'],issuingCompany:['issuingcompany','issuing company','company','carrier'],advisor:['name','advisor','agent'],description:['description','desc','coverage']};
+    var cols={};
+    var hkeys=Object.keys(hm);
+    for(var ki=0;ki<hkeys.length;ki++){
+      var key=hkeys[ki];cols[key]=-1;
+      for(var ci=0;ci<hm[key].length;ci++){for(var hi=0;hi<headers.length;hi++){if(headers[hi].toLowerCase().trim().replace(/\s+/g,' ')===hm[key][ci]){cols[key]=hi;break;}}if(cols[key]>=0)break;}
+    }
+    var savedE={};for(var i=0;i<policies.length;i++){var p=policies[i];savedE[p.accountName+'||'+p.description]={premium:p.premium||'',docuSign:p.docuSign,submitted:p.submitted,epicBilled:p.epicBilled,certsLender:p.certsLender,binder:p.binder,policySent:p.policySent,quoteGL:p.quoteGL,quoteProp:p.quoteProp,quoteUmb:p.quoteUmb,quoteWC:p.quoteWC,quoteFlood:p.quoteFlood,quoteBond:p.quoteBond};}
+    var savedA={};var ans=Object.keys(accounts);for(var i=0;i<ans.length;i++)savedA[ans[i]]={status:accounts[ans[i]].status,boundCarrier:accounts[ans[i]].boundCarrier||'',boundPremium:accounts[ans[i]].boundPremium||'',boundDates:accounts[ans[i]].boundDates||[],dateStatuses:accounts[ans[i]].dateStatuses||{},followupLog:accounts[ans[i]].followupLog||[],dateNotes:accounts[ans[i]].dateNotes||{}};
+    var newRAW=[];
+    for(var i=hr+1;i<raw.length;i++){
+      var row=raw[i];var hasVal=false;for(var j=0;j<row.length;j++){if(row[j]!==''){hasVal=true;break;}}if(!hasVal)continue;
+      var g=function(k){return cols[k]>=0&&row[cols[k]]!==undefined?row[cols[k]]:'';}
+      var expV=g('expDate');var ds2='';
+      if(expV instanceof Date)ds2=expV.toLocaleDateString('en-US');
+      else if(typeof expV==='number'){var d2=new Date(Math.round((expV-25569)*86400000));ds2=d2.toLocaleDateString('en-US');}
+      else ds2=expV.toString();
+      newRAW.push([ds2,g('accountName'),g('issuingCompany'),g('advisor'),g('description')]);
+    }
+    if(!newRAW.length){alert('Could not read data rows.');return;}
+    var mm={};for(var i=0;i<RAW.length;i++)mm[RAW[i][1]+'||'+RAW[i][4]]=RAW[i];
+    for(var i=0;i<newRAW.length;i++)mm[newRAW[i][1]+'||'+newRAW[i][4]]=newRAW[i];
+    RAW.length=0;var mv=Object.values(mm);for(var i=0;i<mv.length;i++)RAW.push(mv[i]);
+    buildData();
+    for(var i=0;i<policies.length;i++){var se=savedE[policies[i].accountName+'||'+policies[i].description];if(se)Object.assign(policies[i],se);}
+    var rns=Object.keys(accounts);for(var i=0;i<rns.length;i++){var sa=savedA[rns[i]];if(sa){
+      // If account-level status is 'Bound' but we have per-card dateStatuses, clear the
+      // account-level status — it was set by an old bug and should not hide remaining cards
+      var acctStatus=sa.status||'';
+      if(acctStatus.toLowerCase()==='bound'&&sa.dateStatuses&&Object.keys(sa.dateStatuses).length>0)acctStatus='';
+      Object.assign(accounts[rns[i]],{status:acctStatus,boundCarrier:sa.boundCarrier||'',boundPremium:sa.boundPremium||'',boundDates:sa.boundDates||[],dateStatuses:sa.dateStatuses||{},followupLog:sa.followupLog||[],dateNotes:sa.dateNotes||{}});
+    }}
+    // Apply any cloud data that arrived via Pull before this Excel upload
+    if(window._cloudAcctCache){var cns=Object.keys(window._cloudAcctCache);for(var i=0;i<cns.length;i++){if(accounts[cns[i]])Object.assign(accounts[cns[i]],window._cloudAcctCache[cns[i]]);}window._cloudAcctCache={};}
+    repairAccountStatuses();
+    try{localStorage.setItem(SK_RAW,JSON.stringify(RAW));}catch(e){}
+    saveAll();populateFilters();updateStats();renderRenewals();renderActions();
+    var an=Object.keys(accounts);document.getElementById('headerSub').textContent=an.length+' accounts · '+policies.length+' policies · uploaded '+new Date().toLocaleDateString();
+    document.getElementById('tb-renewals').textContent=an.length;
+  };
+  if(isCSV)reader.readAsText(file);else reader.readAsBinaryString(file);
+  e.target.value='';
+}
+
+function debugAccount(){
+  var name=prompt('Enter account name to debug (or leave blank for Leuven Group):','Leuven Group');
+  if(!name)return;
+  var a=accounts[name];
+  if(!a){alert('Account "'+name+'" not found in memory.\n\nAll account names:\n'+Object.keys(accounts).sort().join('\n'));return;}
+  var lines=['ACCOUNT: '+a.name,'status: "'+a.status+'"','boundDates: '+JSON.stringify(a.boundDates||[]),'','dateStatuses:'];
+  var ds=a.dateStatuses||{};
+  var dks=Object.keys(ds);
+  if(dks.length===0)lines.push('  (none)');
+  for(var i=0;i<dks.length;i++)lines.push('  '+dks[i]+' → "'+ds[dks[i]]+'"');
+  lines.push('','POLICIES ('+a.policies.length+'):');
+  for(var i=0;i<a.policies.length;i++){
+    var p=a.policies[i];
+    var dk=p.expDate&&!isNaN(p.expDate)?p.expDate.toDateString():'';
+    var cardSt=getCardStatus(a,dk);
+    var chks=[];
+    var CHK2=[{k:'docuSign'},{k:'submitted'},{k:'epicBilled'},{k:'certsLender'},{k:'binder'},{k:'policySent'}];
+    for(var j=0;j<CHK2.length;j++)if(isTruthy(p[CHK2[j].k]))chks.push(CHK2[j].k);
+    var complete=isCardComplete(a,dk);
+    lines.push('  ['+i+'] '+p.description);
+    lines.push('       expDate: '+dk+' | cardStatus: "'+cardSt+'" | isCardComplete: '+complete);
+    lines.push('       checked: '+(chks.length?chks.join(', '):'none'));
+  }
+  alert(lines.join('\n'));
+}
+
+function init(){
+  // Restore saved Excel rows from localStorage so re-upload isn't needed on every visit
+  try{
+    var savedRaw=localStorage.getItem(SK_RAW);
+    if(savedRaw){
+      var parsedRaw=JSON.parse(savedRaw);
+      if(parsedRaw&&parsedRaw.length){
+        // Merge saved rows with any hardcoded RAW rows (saved rows win on conflict)
+        var mm={};
+        for(var i=0;i<RAW.length;i++)mm[RAW[i][1]+'||'+RAW[i][4]]=RAW[i];
+        for(var i=0;i<parsedRaw.length;i++)mm[parsedRaw[i][1]+'||'+parsedRaw[i][4]]=parsedRaw[i];
+        RAW.length=0;var mv=Object.values(mm);for(var i=0;i<mv.length;i++)RAW.push(mv[i]);
+      }
+    }
+  }catch(e){}
+  buildData();loadSaved();repairAccountStatuses();populateFilters();updateStats();
+  renderRenewals();renderNewBiz();renderRules();renderActions();
+  var an=Object.keys(accounts);
+  document.getElementById('headerSub').textContent=an.length+' accounts · '+policies.length+' policies · '+today.toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'});
+  document.getElementById('tb-renewals').textContent=an.length;
+  // Auto-pull from cloud on load to ensure latest data is always shown
+  autoSyncPull();
+}
+
+function autoSyncPull(){
+  var url=getSyncUrl();
+  if(!url)return;
+  gasGet(url,{action:'load'},function(d){
+    if(!d.ok||!d.data||!d.data.policies)return;
+    var rec=d.data;
+    try{
+      applyCloudData(rec);
+      repairAccountStatuses();saveAll();populateFilters();updateStats();renderRenewals();renderActions();renderCompleted();renderCancelled();
+      showSyncTag('☁️ Synced','#1a6fa8');
+    }catch(e){console.warn('Auto-sync pull failed:',e);}
+  });
+}
+
+init();
+</script>
+</body>
+</html>
