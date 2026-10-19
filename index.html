@@ -1008,8 +1008,8 @@ function syncPush(){
   var payload=getSyncPayload();
   var fields=['policies','accounts','newBiz','rules'];
   var fieldIdx=0;
-  // Max safe URL length for JSONP script tag (~6500 chars after all overhead)
-  var URL_LIMIT=6000;
+  // Max safe URL length for JSONP script tag — conservative to account for base URL overhead
+  var URL_LIMIT=4500;
 
   function sendField(){
     if(fieldIdx>=fields.length){
@@ -1029,24 +1029,26 @@ function syncPush(){
         fieldIdx++;sendField();
       });
     } else {
-      // Too large — chunk this field
+      // Too large — chunk this field into pieces that each fit in a URL
+      // URL-encoding can triple char count, so use small chunks (1500 chars raw ≈ ~4500 encoded)
       var session=Date.now().toString(36)+'_'+key;
-      var chunkSize=4000;
+      var chunkSize=1500;
       var chunks=[];
       for(var i=0;i<val.length;i+=chunkSize)chunks.push(val.substring(i,i+chunkSize));
       var total=chunks.length;
       var ci=0;
       function sendChunk(){
         if(ci>=total){
-          gasGet(url,{action:'assembleField',field:key,session:session,total:total,syncedAt:payload.syncedAt||''},function(d){
+          // assembleField params are all short — this URL will always fit
+          gasGet(url,{action:'assembleField',field:key,session:session,total:String(total),syncedAt:payload.syncedAt||''},function(d){
             if(!d.ok){setSyncBtnState(false);showSyncTag('Push assemble error on '+key+': '+(d.error||'failed'),'var(--red)');return;}
             fieldIdx++;sendField();
           });
           return;
         }
         showSyncTag('Pushing '+key+' '+(ci+1)+'/'+total+'…','#1a6fa8');
-        gasGet(url,{action:'chunkField',session:session,idx:ci,data:chunks[ci]},function(d){
-          if(!d.ok){setSyncBtnState(false);showSyncTag('Push chunk error: '+(d.error||'failed'),'var(--red)');return;}
+        gasGet(url,{action:'chunkField',session:session,idx:String(ci),data:chunks[ci]},function(d){
+          if(!d.ok){setSyncBtnState(false);showSyncTag('Push chunk error on '+key+' chunk '+(ci+1)+': '+(d.error||'failed'),'var(--red)');return;}
           ci++;sendChunk();
         });
       }
@@ -1054,6 +1056,43 @@ function syncPush(){
     }
   }
   sendField();
+}
+
+function applyCloudData(rec){
+  // Apply pulled policy data by ID — works even if policies were loaded from Excel
+  var pd=typeof rec.policies==='string'?JSON.parse(rec.policies):rec.policies;
+  var ad=typeof rec.accounts==='string'?JSON.parse(rec.accounts):rec.accounts;
+  if(pd){
+    // Build a lookup by policy id for fast matching
+    var pdById={};var pdKeys=Object.keys(pd);
+    for(var i=0;i<pdKeys.length;i++)pdById[pdKeys[i]]=pd[pdKeys[i]];
+    for(var i=0;i<policies.length;i++){var ps=pdById[policies[i].id];if(ps)Object.assign(policies[i],ps);}
+  }
+  if(ad){
+    var ns=Object.keys(ad);
+    for(var i=0;i<ns.length;i++){
+      var n=ns[i];
+      var src=ad[n];
+      var acctSt=src.status||'';
+      var acctDs=src.dateStatuses||{};
+      if(acctSt.toLowerCase()==='bound'&&Object.keys(acctDs).length>0)acctSt='';
+      var merged={status:acctSt,boundCarrier:src.boundCarrier||'',boundPremium:src.boundPremium||'',boundDates:src.boundDates||[],dateStatuses:acctDs,followupLog:src.followupLog||[],dateNotes:src.dateNotes||{}};
+      if(accounts[n]){
+        // Account exists — merge cloud data over local
+        Object.assign(accounts[n],merged);
+      }
+      // If account doesn't exist in memory (Excel not uploaded on this browser),
+      // the status/statuses are stored and will apply when Excel is uploaded next.
+      // We can't create a full account without the policy list — that comes from Excel.
+      // So store the cloud account data in a holding area for later merging.
+      if(!accounts[n]){
+        if(!window._cloudAcctCache)window._cloudAcctCache={};
+        window._cloudAcctCache[n]=merged;
+      }
+    }
+  }
+  if(rec.newBiz){try{newBiz=typeof rec.newBiz==='string'?JSON.parse(rec.newBiz):rec.newBiz;}catch(e){}}
+  if(rec.rules){try{rules=typeof rec.rules==='string'?JSON.parse(rec.rules):rec.rules;}catch(e){}}
 }
 
 function syncPull(){
@@ -1066,12 +1105,7 @@ function syncPull(){
     var rec=d.data;
     if(!rec||!rec.policies){showSyncTag('Nothing in cloud yet','var(--muted)');return;}
     try{
-      var pd=typeof rec.policies==='string'?JSON.parse(rec.policies):rec.policies;
-      var ad=typeof rec.accounts==='string'?JSON.parse(rec.accounts):rec.accounts;
-      if(pd){for(var i=0;i<policies.length;i++){var ps=pd[policies[i].id];if(ps)Object.assign(policies[i],ps);}}
-      if(ad){var ns=Object.keys(ad);for(var i=0;i<ns.length;i++){var n=ns[i];if(accounts[n]){var acctSt=ad[n].status||'';var acctDs=ad[n].dateStatuses||{};if(acctSt.toLowerCase()==='bound'&&Object.keys(acctDs).length>0)acctSt='';Object.assign(accounts[n],{status:acctSt,boundCarrier:ad[n].boundCarrier||'',boundPremium:ad[n].boundPremium||'',boundDates:ad[n].boundDates||[],dateStatuses:acctDs,followupLog:ad[n].followupLog||[],dateNotes:ad[n].dateNotes||{}});}}}
-      if(rec.newBiz){try{newBiz=typeof rec.newBiz==='string'?JSON.parse(rec.newBiz):rec.newBiz;}catch(e){}}
-      if(rec.rules){try{rules=typeof rec.rules==='string'?JSON.parse(rec.rules):rec.rules;}catch(e){}}
+      applyCloudData(rec);
       repairAccountStatuses();saveAll();populateFilters();updateStats();renderRenewals();renderActions();renderCompleted();renderCancelled();
       showSyncTag('☁️ Pulled! '+new Date().toLocaleTimeString(),'#1a6fa8');
     }catch(e){showSyncTag('Pull parse error: '+e.message,'var(--red)');}
@@ -1096,10 +1130,15 @@ function updateStats() {
   var active=[],comp=[],canc=[];
   for(var i=0;i<al.length;i++){
     if(isCancelled(al[i])){canc.push(al[i]);continue;}
-    // count completed cards per account
+    // count completed and cancelled cards per account
     var byDate={};for(var j=0;j<al[i].policies.length;j++){var pd=al[i].policies[j].expDate&&!isNaN(al[i].policies[j].expDate)?al[i].policies[j].expDate.toDateString():'';if(!byDate[pd])byDate[pd]=[];byDate[pd].push(al[i].policies[j]);}
     var dks=Object.keys(byDate);var hasActive=false;
-    for(var j=0;j<dks.length;j++){if(isCardComplete(al[i],dks[j]))comp.push(al[i]);else hasActive=true;}
+    for(var j=0;j<dks.length;j++){
+      var cst=(getCardStatus(al[i],dks[j])||'').toLowerCase();
+      if(cst==='cancelled'){canc.push(al[i]);}
+      else if(isCardComplete(al[i],dks[j])){comp.push(al[i]);}
+      else{hasActive=true;}
+    }
     if(hasActive)active.push(al[i]);
   }
   var alerts=0;for(var i=0;i<al.length;i++)alerts+=fireRulesOnAccount(al[i]).length;
@@ -1207,6 +1246,7 @@ function renderRenewals() {
       var p=a.policies[j];
       var pdate=p.expDate&&!isNaN(p.expDate)?p.expDate.toDateString():'';
       if(isCardComplete(a,pdate))continue;
+      if((getCardStatus(a,pdate)||'').toLowerCase()==='cancelled')continue;
       if(mf){
         if(!p.expDate||isNaN(p.expDate))continue;
         var pk=p.expDate.getFullYear()+'-'+pad(p.expDate.getMonth()+1);
@@ -1627,24 +1667,49 @@ function renderCancelled() {
   var adv=document.getElementById('cancAdvisor').value;
   var advSel=document.getElementById('cancAdvisor');
   if(advSel.options.length===1){var seen={},advs=[];for(var i=0;i<policies.length;i++){var a2=policies[i].advisor;if(!seen[a2]){seen[a2]=true;advs.push(a2);}}advs.sort();for(var i=0;i<advs.length;i++){var o=document.createElement('option');o.value=advs[i];o.textContent=advs[i];advSel.appendChild(o);}}
-  var al=Object.values(accounts);var filtered=[];
-  for(var i=0;i<al.length;i++){var a=al[i];if(!isCancelled(a))continue;if(search&&a.name.toLowerCase().indexOf(search)<0)continue;if(adv&&a.advisor!==adv)continue;filtered.push(a);}
+  var al=Object.values(accounts);
+  // Collect cancelled entries: either whole-account cancelled, or individual date cards cancelled
+  var entries=[];
+  for(var i=0;i<al.length;i++){
+    var a=al[i];
+    if(search&&a.name.toLowerCase().indexOf(search)<0)continue;
+    if(adv&&a.advisor!==adv)continue;
+    if(isCancelled(a)){
+      // Whole account cancelled (no per-card statuses) — show as before
+      entries.push({acct:a,dateKey:'',wholAcct:true});
+    } else {
+      // Check each date card for per-card Cancelled status
+      var byDate={};for(var j=0;j<a.policies.length;j++){var p=a.policies[j];var dk=p.expDate&&!isNaN(p.expDate)?p.expDate.toDateString():'';if(!byDate[dk])byDate[dk]=[];byDate[dk].push(p);}
+      var dks=Object.keys(byDate);
+      for(var j=0;j<dks.length;j++){
+        if((getCardStatus(a,dks[j])||'').toLowerCase()==='cancelled'){
+          entries.push({acct:a,dateKey:dks[j],pols:byDate[dks[j]],wholAcct:false});
+        }
+      }
+    }
+  }
   var kb=document.getElementById('kanban-cancelled');
-  if(!filtered.length){kb.innerHTML='<div class="empty-state"><div class="icon">🚫</div><h3>No cancelled accounts</h3><p>Set status to <strong>Cancelled</strong></p></div>';return;}
-  var groups={};for(var i=0;i<filtered.length;i++){var k=filtered[i].advisor||'Unassigned';if(!groups[k])groups[k]=[];groups[k].push(filtered[i]);}
+  if(!entries.length){kb.innerHTML='<div class="empty-state"><div class="icon">🚫</div><h3>No cancelled accounts</h3><p>Set status to <strong>Cancelled</strong></p></div>';return;}
+  var groups={};for(var i=0;i<entries.length;i++){var k=(entries[i].acct.advisor)||'Unassigned';if(!groups[k])groups[k]=[];groups[k].push(entries[i]);}
   var gk=Object.keys(groups).sort();var html='';
   for(var i=0;i<gk.length;i++){
     var k=gk[i];var items=groups[k];var cards='';
     for(var j=0;j<items.length;j++){
-      var a=items[j];
-      var dates=[];for(var m=0;m<a.policies.length;m++){if(a.policies[m].expDate&&!isNaN(a.policies[m].expDate))dates.push(a.policies[m].expDate);}
-      dates.sort(function(x,y){return x-y;});
-      var ds=dates.length?dates[0].toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}):'—';
+      var ent=items[j];var a=ent.acct;
       var sn=a.name.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+      var dkEsc=(ent.dateKey||'').replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+      var ds='—';
+      if(ent.dateKey){
+        var d=new Date(ent.dateKey);if(!isNaN(d))ds=d.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
+      } else {
+        var dates=[];for(var m=0;m<a.policies.length;m++){if(a.policies[m].expDate&&!isNaN(a.policies[m].expDate))dates.push(a.policies[m].expDate);}
+        dates.sort(function(x,y){return x-y;});
+        if(dates.length)ds=dates[0].toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
+      }
       cards+='<div class="acard" style="border-left-color:#999;opacity:0.9">'
         +'<div class="canc-banner"><span style="font-size:12px;font-weight:700;color:#666">🚫 Cancelled</span></div>'
         +'<div class="acard-header"><div class="acard-name">'+a.name+'</div><div class="acard-meta"><span class="days-badge db-na">📅 '+ds+'</span></div></div>'
-        +'<div class="acard-advisor"><div class="advisor-tag" style="padding:0 18px 12px">👤 <span>'+a.advisor+'</span></div><div style="padding:0 18px 12px"><button class="followup-btn" style="background:#fdeaea;color:var(--red)" onclick="undoCancelled(\''+sn+'\')">↩ Move Back</button></div></div>'
+        +'<div class="acard-advisor"><div class="advisor-tag" style="padding:0 18px 12px">👤 <span>'+a.advisor+'</span></div><div style="padding:0 18px 12px"><button class="followup-btn" style="background:#fdeaea;color:var(--red)" onclick="undoCancelled(\''+sn+'\',\''+dkEsc+'\')">↩ Move Back</button></div></div>'
         +'</div>';
     }
     html+='<div class="col"><div class="col-header"><h3>'+k+'</h3><span class="col-count">'+items.length+'</span></div><div class="col-body">'+cards+'</div></div>';
@@ -1652,7 +1717,17 @@ function renderCancelled() {
   kb.innerHTML=html;
 }
 
-function undoCancelled(name){var a=accounts[name];if(!a)return;a.status='';updateStats();renderCancelled();renderRenewals();}
+function undoCancelled(name,dateKey){
+  var a=accounts[name];if(!a)return;
+  if(dateKey){
+    // Per-card cancel — clear just that card's status
+    setCardStatus(a,dateKey,'');
+  } else {
+    // Whole-account cancel (legacy)
+    a.status='';
+  }
+  updateStats();renderCancelled();renderRenewals();saveAll();
+}
 
 function renderNewBiz() {
   var search=document.getElementById('nbSearch').value.toLowerCase();
@@ -1815,6 +1890,8 @@ function handleFile(e){
       if(acctStatus.toLowerCase()==='bound'&&sa.dateStatuses&&Object.keys(sa.dateStatuses).length>0)acctStatus='';
       Object.assign(accounts[rns[i]],{status:acctStatus,boundCarrier:sa.boundCarrier||'',boundPremium:sa.boundPremium||'',boundDates:sa.boundDates||[],dateStatuses:sa.dateStatuses||{},followupLog:sa.followupLog||[],dateNotes:sa.dateNotes||{}});
     }}
+    // Apply any cloud data that arrived via Pull before this Excel upload
+    if(window._cloudAcctCache){var cns=Object.keys(window._cloudAcctCache);for(var i=0;i<cns.length;i++){if(accounts[cns[i]])Object.assign(accounts[cns[i]],window._cloudAcctCache[cns[i]]);}window._cloudAcctCache={};}
     repairAccountStatuses();saveAll();populateFilters();updateStats();renderRenewals();renderActions();
     var an=Object.keys(accounts);document.getElementById('headerSub').textContent=an.length+' accounts · '+policies.length+' policies · uploaded '+new Date().toLocaleDateString();
     document.getElementById('tb-renewals').textContent=an.length;
@@ -1866,12 +1943,7 @@ function autoSyncPull(){
     if(!d.ok||!d.data||!d.data.policies)return;
     var rec=d.data;
     try{
-      var pd=typeof rec.policies==='string'?JSON.parse(rec.policies):rec.policies;
-      var ad=typeof rec.accounts==='string'?JSON.parse(rec.accounts):rec.accounts;
-      if(pd){for(var i=0;i<policies.length;i++){var ps=pd[policies[i].id];if(ps)Object.assign(policies[i],ps);}}
-      if(ad){var ns=Object.keys(ad);for(var i=0;i<ns.length;i++){var n=ns[i];if(accounts[n]){var acctSt2=ad[n].status||'';var acctDs2=ad[n].dateStatuses||{};if(acctSt2.toLowerCase()==='bound'&&Object.keys(acctDs2).length>0)acctSt2='';Object.assign(accounts[n],{status:acctSt2,boundCarrier:ad[n].boundCarrier||'',boundPremium:ad[n].boundPremium||'',boundDates:ad[n].boundDates||[],dateStatuses:acctDs2,followupLog:ad[n].followupLog||[],dateNotes:ad[n].dateNotes||{}});}}}
-      if(rec.newBiz){try{newBiz=typeof rec.newBiz==='string'?JSON.parse(rec.newBiz):rec.newBiz;}catch(e){}}
-      if(rec.rules){try{rules=typeof rec.rules==='string'?JSON.parse(rec.rules):rec.rules;}catch(e){}}
+      applyCloudData(rec);
       repairAccountStatuses();saveAll();populateFilters();updateStats();renderRenewals();renderActions();renderCompleted();renderCancelled();
       showSyncTag('☁️ Synced','#1a6fa8');
     }catch(e){console.warn('Auto-sync pull failed:',e);}
