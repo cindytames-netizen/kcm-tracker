@@ -657,10 +657,6 @@ var RAW=[
 ["12/14/2026", "TR3 Capital, LLC", "TRASP1", "Todd Sherrer", "General Liability - Mission at Medical"],
 ["12/14/2026", "TR3 Capital, LLC", "ATESP2", "Todd Sherrer", "Commercial Umbrella - $2M - Mission at Medical"],
 ["12/14/2026", "TR3 Capital, LLC", "SCOIN1", "Todd Sherrer", "Commercial Umbrella - $3M XS of $2M-  Mission at Medical"],
-["12/14/2026", "Equimax Management, LLC", "KININ1", "Todd Range", "General Liability - Hunters Glen"],
-["12/14/2026", "Regional Investment and Management", "MOUVE1", "Todd Range", "General Liability - Riverstone 845"],
-["12/14/2026", "Regional Investment and Management", "MIDIN5", "Todd Range", "Commercial Umbrella - Riverstone $10M"],
-["12/14/2026", "TR3 Capital, LLC", "SCOIN1", "Todd Sherrer", "Commercial Umbrella - $3M XS - Mission at Medical"],
 ["12/14/2026", "Vaquero Assets, LTD", "TRASP1", "Ray Deaton", "General Liability"],
 ["12/14/2026", "Vaquero Assets, LTD", "ATESP2", "Ray Deaton", "Commercial Umbrella $2M"],
 ["12/15/2026", "RNPH Properties, LLC", "WESWO1", "Todd Range", "General Liability"],
@@ -1192,14 +1188,34 @@ function loadSaved() {
         // Detect old numeric-keyed data and migrate to stable keys
         var keys=Object.keys(ed.policies);
         var isNumeric=keys.length>0&&!isNaN(parseInt(keys[0],10))&&keys[0]===String(parseInt(keys[0],10));
+        // Detect old stable keys without year suffix (account||desc but no trailing ||YYYY)
+        var hasNoYear=!isNumeric&&keys.length>0&&!/\|\|\d{4}$/.test(keys[0]);
         if(isNumeric){
-          // Remap: old index → policy at that index in current RAW → stable id
+          // Remap: old numeric index → stable key via LEGACY_POL_MAP + append year
           var remapped={};
           for(var ki=0;ki<keys.length;ki++){
-            var oldIdx=parseInt(keys[ki],10);
             var stableKey=LEGACY_POL_MAP[keys[ki]];
             // Append ||2026 since legacy data was all 2026 renewals
             if(stableKey){remapped[stableKey+'||2026']=ed.policies[keys[ki]];}
+          }
+          ed.policies=remapped;
+        } else if(hasNoYear){
+          // Remap: old stable key (no year) → find matching policy and append its year
+          // Build lookup: baseKey (account||desc) → array of matching policy ids (may have 2026+2027)
+          var byBase={};
+          for(var pi2=0;pi2<policies.length;pi2++){
+            var pid2=policies[pi2].id;
+            var base2=pid2.replace(/\|\|\d{4}$/,'');
+            if(!byBase[base2])byBase[base2]=[];
+            byBase[base2].push(pid2);
+          }
+          var remapped={};
+          for(var ki=0;ki<keys.length;ki++){
+            var matches=byBase[keys[ki]];
+            if(matches){
+              // Apply saved state to ALL matching year variants
+              for(var mi=0;mi<matches.length;mi++){remapped[matches[mi]]=ed.policies[keys[ki]];}
+            }
           }
           ed.policies=remapped;
         }
@@ -1382,12 +1398,28 @@ function applyCloudData(rec){
     // Remap legacy numeric keys to stable keys using the baked-in mapping table
     var pdKeys=Object.keys(pd);
     var isNumeric=pdKeys.length>0&&!isNaN(parseInt(pdKeys[0],10))&&pdKeys[0]===String(parseInt(pdKeys[0],10));
+    var hasNoYear=!isNumeric&&pdKeys.length>0&&!/\|\|\d{4}$/.test(pdKeys[0]);
     if(isNumeric){
       var remapped={};
       for(var ki=0;ki<pdKeys.length;ki++){
         var stableKey=LEGACY_POL_MAP[pdKeys[ki]];
         // Append ||2026 since legacy cloud data was all 2026 renewals
         if(stableKey)remapped[stableKey+'||2026']=pd[pdKeys[ki]];
+      }
+      pd=remapped;
+    } else if(hasNoYear){
+      // Remap old stable keys (no year) to new year-suffixed keys
+      var byBase={};
+      for(var pi2=0;pi2<policies.length;pi2++){
+        var pid2=policies[pi2].id;
+        var base2=pid2.replace(/\|\|\d{4}$/,'');
+        if(!byBase[base2])byBase[base2]=[];
+        byBase[base2].push(pid2);
+      }
+      var remapped={};
+      for(var ki=0;ki<pdKeys.length;ki++){
+        var matches=byBase[pdKeys[ki]];
+        if(matches){for(var mi=0;mi<matches.length;mi++){remapped[matches[mi]]=pd[pdKeys[ki]];}}
       }
       pd=remapped;
     }
