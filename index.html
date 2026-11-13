@@ -1075,7 +1075,11 @@ function cardChecksComplete(a,dateKey) {
   }
   if(!pols.length)return false;
   for(var i=0;i<pols.length;i++){
-    for(var j=0;j<CHK.length;j++){if(!isTruthy(pols[i][CHK[j].k]))return false;}
+    for(var j=0;j<CHK.length;j++){
+      // Skip lossRuns check for policy types that don't require it
+      if(CHK[j].k==='lossRuns'&&!needsLossRuns(pols[i].description))continue;
+      if(!isTruthy(pols[i][CHK[j].k]))return false;
+    }
   }
   return true;
 }
