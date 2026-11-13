@@ -370,9 +370,20 @@ header{background:linear-gradient(135deg,var(--sky-dark),var(--green));padding:0
 <script>
 var SK='kcm_v5', SK_NB='kcm_nb_v3', SK_RULES='kcm_rules_v3', SK_RAW='kcm_raw_v1';
 var ADVISORS=['Guy Billups','Todd Range','Riley Wilhoit','Ray Deaton','Todd Sherrer','Brad Soto','Brent Guldahl','DJ Drysdale Jr','Agency House - CIS'];
-var CHK=[{k:'docuSign',l:'DocuSign'},{k:'submitted',l:'Submitted'},{k:'epicBilled',l:'EPIC'},{k:'certsLender',l:'Certs'},{k:'binder',l:'Binder'},{k:'policySent',l:'Policy Sent'}];
+var CHK=[{k:'lossRuns',l:'Loss Runs'},{k:'docuSign',l:'DocuSign'},{k:'submitted',l:'Submitted'},{k:'epicBilled',l:'EPIC'},{k:'certsLender',l:'Certs'},{k:'binder',l:'Binder'},{k:'policySent',l:'Policy Sent'}];
+// Policy types that do NOT require loss runs
+function needsLossRuns(desc) {
+  var d=(desc||'').toLowerCase();
+  if(d.indexOf('flood')>=0)return false;
+  if(d.indexOf('boiler')>=0)return false;
+  if(d.indexOf('worker')>=0||d.indexOf('work comp')>=0)return false;
+  if(d.indexOf('epli')>=0||d.indexOf('employment practices')>=0)return false;
+  if(d.indexOf('terrorism')>=0)return false;
+  return true;
+}
 var QUOTES=[{k:'quoteGL',l:'GL'},{k:'quoteProp',l:'Property'},{k:'quoteUmb',l:'Umbrella'},{k:'quoteWC',l:'Work Comp'},{k:'quoteFlood',l:'Flood'},{k:'quoteBond',l:'Bond'}];
 var DEFAULT_RULES=[
+  {id:'r1',name:'Loss Runs Not Received (120 days)',desc:'Loss runs not received and renewal ≤ 120 days (excludes Flood, Boiler, Work Comp, EPLI, Terrorism)',field:'lossRuns',op:'notChecked',val:'',daysCond:'lte',daysVal:120,msg:'Request loss runs',severity:'warn',on:true,builtIn:true},
   {id:'r2',name:'Not Submitted (120 days)',desc:'No submission and renewal ≤ 120 days',field:'submitted',op:'notChecked',val:'',daysCond:'lte',daysVal:120,msg:'Escalate — not yet submitted',severity:'crit',on:true,builtIn:true},
   {id:'r3',name:'Bound but Policy Not Sent',desc:'Policy bound but not sent to insured',field:'policySent',op:'notChecked',val:'',daysCond:'any',daysVal:0,msg:'Follow up — send policy to insured',severity:'warn',on:true,builtIn:true}
 ];
@@ -1041,7 +1052,7 @@ function buildData() {
     // Year is included so 2026 and 2027 renewals of the same policy have independent checkbox state
     var expYear = isNaN(exp) ? '' : '||'+exp.getFullYear();
     var stableId = (r[1]+'||'+r[4]+expYear).replace(/[^a-zA-Z0-9|]/g,function(c){return '_';});
-    var pol = {id:stableId, _idx:i, accountName:r[1], issuingCompany:r[2], advisor:r[3], description:r[4], expDate:exp, daysUntil:days, premium:'', docuSign:'', submitted:'', epicBilled:'', certsLender:'', binder:'', policySent:'', quoteGL:'', quoteProp:'', quoteUmb:'', quoteWC:'', quoteFlood:'', quoteBond:''};
+    var pol = {id:stableId, _idx:i, accountName:r[1], issuingCompany:r[2], advisor:r[3], description:r[4], expDate:exp, daysUntil:days, premium:'', lossRuns:'', docuSign:'', submitted:'', epicBilled:'', certsLender:'', binder:'', policySent:'', quoteGL:'', quoteProp:'', quoteUmb:'', quoteWC:'', quoteFlood:'', quoteBond:''};
     policies.push(pol);
     if (!accounts[r[1]]) accounts[r[1]] = {name:r[1], advisor:r[3], status:'', followupLog:[], policies:[]};
     accounts[r[1]].policies.push(pol);
@@ -1137,6 +1148,8 @@ function fireRulesOnPolicy(pol,acct) {
     if(!r.on)continue;
     if(r.daysCond==='lte'&&(pol.daysUntil===null||pol.daysUntil>r.daysVal))continue;
     if(r.daysCond==='gte'&&(pol.daysUntil===null||pol.daysUntil<r.daysVal))continue;
+    // Suppress loss runs alert for policy types that don't require them
+    if(r.op==='notChecked'&&r.field==='lossRuns'&&!needsLossRuns(pol.description))continue;
     // Suppress "not yet submitted" escalation if card status shows work is underway
     if(r.op==='notChecked'&&r.field==='submitted'&&isWorking)continue;
     // Suppress "policy not sent" alert if card is not yet Bound (policy can't be sent before binding)
@@ -1236,7 +1249,7 @@ function loadSaved() {
 function saveAll() {
   try {
     var pd={};
-    for(var i=0;i<policies.length;i++){var p=policies[i];pd[p.id]={premium:p.premium||'',boundCarrier:p.boundCarrier||'',boundPremium:p.boundPremium||'',docuSign:p.docuSign,submitted:p.submitted,epicBilled:p.epicBilled,certsLender:p.certsLender,binder:p.binder,policySent:p.policySent,quoteGL:p.quoteGL,quoteProp:p.quoteProp,quoteUmb:p.quoteUmb,quoteWC:p.quoteWC,quoteFlood:p.quoteFlood,quoteBond:p.quoteBond};}
+    for(var i=0;i<policies.length;i++){var p=policies[i];pd[p.id]={premium:p.premium||'',boundCarrier:p.boundCarrier||'',boundPremium:p.boundPremium||'',lossRuns:p.lossRuns,docuSign:p.docuSign,submitted:p.submitted,epicBilled:p.epicBilled,certsLender:p.certsLender,binder:p.binder,policySent:p.policySent,quoteGL:p.quoteGL,quoteProp:p.quoteProp,quoteUmb:p.quoteUmb,quoteWC:p.quoteWC,quoteFlood:p.quoteFlood,quoteBond:p.quoteBond};}
     var ad={};var ns=Object.keys(accounts);for(var i=0;i<ns.length;i++){var n=ns[i];ad[n]={status:accounts[n].status,boundCarrier:accounts[n].boundCarrier||'',boundPremium:accounts[n].boundPremium||'',boundDates:accounts[n].boundDates||[],dateStatuses:accounts[n].dateStatuses||{},followupLog:accounts[n].followupLog||[],dateNotes:accounts[n].dateNotes||{}};}
     localStorage.setItem(SK,JSON.stringify({policies:pd,accounts:ad,savedAt:new Date().toISOString()}));
     localStorage.setItem(SK_NB,JSON.stringify(newBiz));
@@ -1268,7 +1281,7 @@ function closeSyncConfig(){document.getElementById('syncOverlay').classList.add(
 
 function getSyncPayload(){
   var pd={};
-  for(var i=0;i<policies.length;i++){var p=policies[i];pd[p.id]={premium:p.premium||'',boundCarrier:p.boundCarrier||'',boundPremium:p.boundPremium||'',docuSign:p.docuSign,submitted:p.submitted,epicBilled:p.epicBilled,certsLender:p.certsLender,binder:p.binder,policySent:p.policySent,quoteGL:p.quoteGL,quoteProp:p.quoteProp,quoteUmb:p.quoteUmb,quoteWC:p.quoteWC,quoteFlood:p.quoteFlood,quoteBond:p.quoteBond};}
+  for(var i=0;i<policies.length;i++){var p=policies[i];pd[p.id]={premium:p.premium||'',boundCarrier:p.boundCarrier||'',boundPremium:p.boundPremium||'',lossRuns:p.lossRuns,docuSign:p.docuSign,submitted:p.submitted,epicBilled:p.epicBilled,certsLender:p.certsLender,binder:p.binder,policySent:p.policySent,quoteGL:p.quoteGL,quoteProp:p.quoteProp,quoteUmb:p.quoteUmb,quoteWC:p.quoteWC,quoteFlood:p.quoteFlood,quoteBond:p.quoteBond};}
   var ad={};var ns=Object.keys(accounts);
   for(var i=0;i<ns.length;i++){var n=ns[i];ad[n]={status:accounts[n].status,boundCarrier:accounts[n].boundCarrier||'',boundPremium:accounts[n].boundPremium||'',boundDates:accounts[n].boundDates||[],dateStatuses:accounts[n].dateStatuses||{},followupLog:accounts[n].followupLog||[],dateNotes:accounts[n].dateNotes||{}};}
   return {policies:pd,accounts:ad,newBiz:JSON.stringify(newBiz),rules:JSON.stringify(rules),syncedAt:new Date().toISOString()};
@@ -1669,7 +1682,7 @@ function makeCard(a,visiblePols) {
     var p=pols[i];
     var isCancA=isCancelled(a);
     var chk='';
-    if(!isCancA){for(var j=0;j<CHK.length;j++){var f=CHK[j];chk+='<span class="chk '+(isTruthy(p[f.k])?'done':'undone')+'" onclick="togglePol(\''+p.id+'\',\''+f.k+'\',this,event)">'+(isTruthy(p[f.k])?'✔ ':'')+f.l+'</span>';}}
+    if(!isCancA){for(var j=0;j<CHK.length;j++){var f=CHK[j];if(f.k==='lossRuns'&&!needsLossRuns(p.description))continue;chk+='<span class="chk '+(isTruthy(p[f.k])?'done':'undone')+'" onclick="togglePol(\''+p.id+'\',\''+f.k+'\',this,event)">'+(isTruthy(p[f.k])?'✔ ':'')+f.l+'</span>';}}
     var qchk='';
     if(!isCancA){for(var j=0;j<QUOTES.length;j++){var q=QUOTES[j];if(isRelevantQuote(p.description,q.k))qchk+='<span class="qchk '+(isTruthy(p[q.k])?'done':'undone')+'" onclick="togglePol(\''+p.id+'\',\''+q.k+'\',this,event)">'+(isTruthy(p[q.k])?'✔ ':'')+q.l+'</span>';}}
     var pd=p.expDate&&!isNaN(p.expDate)?fmtD(p.expDate):'';
@@ -2230,7 +2243,7 @@ function handleFile(e){
       var key=hkeys[ki];cols[key]=-1;
       for(var ci=0;ci<hm[key].length;ci++){for(var hi=0;hi<headers.length;hi++){if(headers[hi].toLowerCase().trim().replace(/\s+/g,' ')===hm[key][ci]){cols[key]=hi;break;}}if(cols[key]>=0)break;}
     }
-    var savedE={};for(var i=0;i<policies.length;i++){var p=policies[i];savedE[p.accountName+'||'+p.description]={premium:p.premium||'',docuSign:p.docuSign,submitted:p.submitted,epicBilled:p.epicBilled,certsLender:p.certsLender,binder:p.binder,policySent:p.policySent,quoteGL:p.quoteGL,quoteProp:p.quoteProp,quoteUmb:p.quoteUmb,quoteWC:p.quoteWC,quoteFlood:p.quoteFlood,quoteBond:p.quoteBond};}
+    var savedE={};for(var i=0;i<policies.length;i++){var p=policies[i];savedE[p.accountName+'||'+p.description]={premium:p.premium||'',lossRuns:p.lossRuns,docuSign:p.docuSign,submitted:p.submitted,epicBilled:p.epicBilled,certsLender:p.certsLender,binder:p.binder,policySent:p.policySent,quoteGL:p.quoteGL,quoteProp:p.quoteProp,quoteUmb:p.quoteUmb,quoteWC:p.quoteWC,quoteFlood:p.quoteFlood,quoteBond:p.quoteBond};}
     var savedA={};var ans=Object.keys(accounts);for(var i=0;i<ans.length;i++)savedA[ans[i]]={status:accounts[ans[i]].status,boundCarrier:accounts[ans[i]].boundCarrier||'',boundPremium:accounts[ans[i]].boundPremium||'',boundDates:accounts[ans[i]].boundDates||[],dateStatuses:accounts[ans[i]].dateStatuses||{},followupLog:accounts[ans[i]].followupLog||[],dateNotes:accounts[ans[i]].dateNotes||{}};
     var newRAW=[];
     for(var i=hr+1;i<raw.length;i++){
